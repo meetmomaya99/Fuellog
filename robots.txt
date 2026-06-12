@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fuellog-5t6.pages.dev/sitemap.xml

@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FuelLog</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- PWA: installable on Android and iOS -->
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- iOS PWA support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FuelLog">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- Theme colour — light and dark variants -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#1D9E75">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)"  content="#0F6E56">
+  <meta name="description" content="Track your fuel, oil changes, and car maintenance. See your real cost per km.">
+
+  <!-- Prevent phone number detection -->
+  <meta name="format-detection" content="telephone=no">
+
+  <style>
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal:        #1D9E75;
+      --teal-light:  #E1F5EE;
+      --teal-dark:   #0F6E56;
+      --amber:       #EF9F27;
+      --amber-light: #FAEEDA;
+      --amber-dark:  #854F0B;
+      --violet:      #7C5CBF;
+      --violet-light:#EDE9F8;
+      --violet-dark: #4B357A;
+      --rose:        #E05C7A;
+      --rose-light:  #FCEEF2;
+      --rose-dark:   #8C1F38;
+      --red-light:   #FCEBEB;
+      --red-dark:    #A32D2D;
+      --bg:          #f2f2f0;
+      --surface:     #ffffff;
+      --text:        #1a1a1a;
+      --muted:       #525252;
+      --hint:        #696969;
+      --border:      rgba(0,0,0,0.07);
+      --border-s:    rgba(0,0,0,0.16);
+      --shadow:      0 1px 4px rgba(0,0,0,0.07);
+      --radius:      16px;
+      --radius-sm:   10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:          #141414;
+        --surface:     #1f1f1f;
+        --text:        #f0f0f0;
+        --muted:       #c0c0c0;
+        --hint:        #909090;
+        --border:      rgba(255,255,255,0.07);
+        --border-s:    rgba(255,255,255,0.16);
+        --shadow:      0 1px 4px rgba(0,0,0,0.3);
+        --teal-light:  #04342C;
+        --amber-light: #3a2000;
+        --violet-light:#2a1f45;
+        --rose-light:  #3d0f1e;
+        --red-light:   #3d1010;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      padding: 0.7rem 1rem 0.45rem;
+      gap: 8px;
+    }
+    .logo { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; flex-shrink: 0; }
+    .logo span { color: var(--teal); }
+
+    .car-switcher {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 5px;
+      background: var(--bg);
+      border: 1px solid var(--border-s);
+      border-radius: 20px;
+      padding: 5px 11px;
+      cursor: pointer; font-family: inherit; font-size: 13px;
+      font-weight: 500; color: var(--text);
+      overflow: hidden; white-space: nowrap;
+    }
+    .car-switcher .car-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .car-switcher .car-caret { color: var(--hint); font-size: 10px; flex-shrink: 0; }
+
+    nav {
+      display: flex; gap: 4px;
+      padding: 0 1rem 0.65rem;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    nav button {
+      flex-shrink: 0; padding: 6px 14px; border-radius: 20px; border: none;
+      background: transparent; color: var(--muted); font-size: 13px;
+      font-weight: 500; font-family: inherit; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    nav button.active { background: var(--teal); color: #fff; }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    main { max-width: 680px; margin: 0 auto; padding: 0.85rem 0.85rem 5rem; }
+    .page        { display: none; }
+    .page.active { display: block; }
+
+    /* Single label system — used sparingly only where content is ambiguous */
+    .section-title {
+      font-size: 11px; font-weight: 700; color: var(--hint);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin: 1.1rem 0 0.5rem; padding: 0 2px;
+    }
+    .section-title:first-child { margin-top: 0.1rem; }
+
+    /* ── Cards — no border, rely on shadow + surface/bg contrast ── */
+    .card {
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Unified data-card: metrics, status cards, oil cards all use this ── */
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 0.75rem;
+    }
+    .data-card {
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Colour accent strip — only when a state is set */
+    .data-card[data-accent]::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      border-radius: 10px 0 0 10px;
+    }
+    .data-card[data-accent="teal"]::before   { background: var(--teal); }
+    .data-card[data-accent="amber"]::before  { background: var(--amber); }
+    .data-card[data-accent="red"]::before    { background: var(--red-dark); }
+    .data-card[data-accent="violet"]::before { background: var(--violet); }
+    .data-card .lbl { font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 500; }
+    .data-card .val { font-size: 19px; font-weight: 700; line-height: 1.2; }
+    .data-card .val .unit { font-size: 12px; font-weight: 400; color: var(--muted); }
+    .data-card .sub { font-size: 11px; color: var(--hint); margin-top: 2px; }
+    /* State colours on value */
+    .data-card.warn    .val { color: var(--amber-dark); }
+    .data-card.overdue .val { color: var(--red-dark); }
+    .data-card.violet  .val { color: var(--violet-dark); }
+
+    /* ── Cost breakdown ──────────────────────────────────── */
+    .cpkm-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.65rem; flex-wrap: wrap; gap: 8px;
+    }
+    .cpkm-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .range-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+    .range-pill {
+      padding: 4px 10px; border-radius: 20px;
+      border: 1px solid var(--border-s); background: transparent;
+      font-size: 12px; font-family: inherit; color: var(--muted);
+      cursor: pointer; white-space: nowrap;
+    }
+    .range-pill.active { background: var(--teal); color: #fff; border-color: var(--teal); }
+    .cpkm-custom-dates {
+      display: none; gap: 8px; margin-bottom: 0.65rem; align-items: center;
+    }
+    .cpkm-custom-dates.visible { display: flex; }
+    .cpkm-custom-dates input {
+      flex: 1; padding: 8px 10px; border: 1px solid var(--border-s);
+      border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+      background: var(--surface); color: var(--text);
+    }
+    .cpkm-custom-dates span { font-size: 13px; color: var(--hint); flex-shrink: 0; }
+
+    .cost-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px; gap: 8px;
+    }
+    .cost-row:last-child { border-bottom: none; }
+    .cost-row .ck { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .cost-row .cv { font-weight: 600; }
+    .cost-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cost-total-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 0 0; margin-top: 4px;
+      border-top: 1px solid var(--border-s);
+      font-size: 15px; font-weight: 700;
+    }
+
+    /* ── Alert banner ───────────────────────────────────── */
+    .oil-alert {
+      display: none; border-radius: var(--radius-sm);
+      padding: 11px 14px; margin-bottom: 0.75rem;
+      font-size: 13px; line-height: 1.5; border-left: 3px solid;
+    }
+    .oil-alert.warn    { background: var(--amber-light); color: var(--amber-dark); border-color: var(--amber); }
+    .oil-alert.overdue { background: var(--red-light);   color: var(--red-dark);   border-color: var(--red-dark); }
+    .oil-alert a       { color: inherit; font-weight: 600; }
+
+    /* ── Charts ─────────────────────────────────────────── */
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .chart-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .chart-select {
+      font-size: 12px; font-family: inherit; color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border-s);
+      border-radius: var(--radius-sm); padding: 4px 8px; cursor: pointer; flex-shrink: 0;
+    }
+    .chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .chart-scroll::-webkit-scrollbar { display: none; }
+    .chart-wrap {
+      display: flex; align-items: flex-end; gap: 5px;
+      height: 100px; min-width: calc(var(--bar-count, 10) * 33px);
+    }
+    .bar-col {
+      flex: 1; min-width: 28px; display: flex; flex-direction: column;
+      align-items: center; gap: 3px; height: 100%; justify-content: flex-end;
+    }
+    .bar-col .bar { width: 100%; background: var(--teal); border-radius: 4px 4px 0 0; min-height: 2px; }
+    .bar-col .bv  { font-size: 8px; color: var(--muted); line-height: 1; }
+    .bar-col .bl  { font-size: 8px; color: var(--hint); }
+    .bar-col .bar.bar-estimated {
+      opacity: 0.55;
+      background-image: repeating-linear-gradient(45deg,rgba(255,255,255,0.25) 0px,rgba(255,255,255,0.25) 3px,transparent 3px,transparent 7px);
+      background-size: 10px 10px;
+    }
+    .bar-col .bv-est { font-size: 9px; color: var(--amber-dark); line-height: 1; margin-bottom: 1px; }
+    .chart-legend { font-size: 11px; color: var(--hint); margin-top: 5px; display: none; }
+
+    /* ── Gap warning button ──────────────────────────────── */
+    .gap-warn-btn {
+      background: none; border: none; padding: 0; cursor: pointer;
+      font-size: 13px; display: inline-flex; align-items: center; gap: 4px;
+      color: var(--amber-dark); font-family: inherit; font-weight: 500; white-space: nowrap;
+    }
+    .gap-warn-btn:active { opacity: 0.7; }
+
+    /* ── Stat rows ──────────────────────────────────────── */
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px; gap: 8px;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .sk { color: var(--muted); flex-shrink: 0; }
+    .stat-row .sv { font-weight: 600; text-align: right; }
+
+    /* ── Form cards — each field is its own card row ──────── */
+    .form-card {
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      overflow: hidden;       /* clips child border-radius at edges */
+    }
+    .form-row {
+      display: flex;
+      align-items: center;
+      padding: 13px 16px;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-row:last-child { border-bottom: none; }
+    .form-row label {
+      flex: 0 0 auto;
+      min-width: 110px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0;
+    }
+    .form-row input,
+    .form-row select.form-select {
+      flex: 1;
+      border: none;
+      background: transparent;
+      text-align: right;
+      padding: 0;
+      font-size: 15px;
+      color: var(--text);
+      font-family: inherit;
+      width: auto;
+      min-width: 0;
+      -moz-appearance: textfield;
+    }
+    .form-row input::placeholder { color: var(--hint); }
+    .form-row input:focus,
+    .form-row select.form-select:focus { outline: none; }
+    .form-row input[readonly] { color: var(--muted); }
+    .form-row select.form-select {
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23909090' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: left center;
+      padding-left: 18px;
+    }
+    /* Auto-label shown next to price/unit label */
+    .form-row .auto-hint {
+      font-size: 11px; color: var(--hint); margin-left: 4px; font-weight: 400;
+    }
+    /* Save button card — sits below the field group */
+    .form-save-card {
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Forms (modal — keep original grid for edit modals) ── */
+
+    /* ── Forms ──────────────────────────────────────────── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .form-full { grid-column: 1 / -1; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+    input[type="number"],
+    input[type="date"],
+    input[type="text"],
+    select.form-select {
+      padding: 10px 12px; border: 1px solid var(--border-s);
+      border-radius: var(--radius-sm); font-size: 16px; font-family: inherit;
+      background: var(--surface); color: var(--text); width: 100%;
+      -moz-appearance: textfield;
+    }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input:focus, select.form-select:focus { outline: none; border-color: var(--teal); }
+    input[readonly] { background: var(--bg); color: var(--muted); }
+
+    /* ── Buttons ────────────────────────────────────────── */
+    .btn-primary {
+      background: var(--teal); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 13px 24px;
+      font-size: 16px; font-weight: 600; font-family: inherit;
+      cursor: pointer; width: 100%; margin-top: 4px;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:active { opacity: 0.82; }
+    .btn-outline {
+      padding: 8px 13px; border: 1px solid var(--border-s);
+      border-radius: var(--radius-sm); background: transparent;
+      color: var(--text); font-size: 13px; font-family: inherit;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.12s;
+    }
+    .btn-outline:active { background: var(--bg); }
+    .btn-sm {
+      padding: 5px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border-s); background: transparent;
+      font-size: 12px; font-family: inherit; cursor: pointer; color: var(--text);
+    }
+    /* Danger variant — used for Delete all */
+    .btn-danger {
+      padding: 8px 13px; border: none; border-radius: var(--radius-sm);
+      background: var(--red-light); color: var(--red-dark);
+      font-size: 13px; font-family: inherit; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.12s;
+    }
+    .btn-danger:active { opacity: 0.75; }
+
+    /* ── History toolbar ─────────────────────────────────── */
+    .history-toolbar {
+      display: flex; gap: 6px; margin-bottom: 0.85rem; align-items: center;
+    }
+    .history-toolbar .btn-outline { font-size: 12px; padding: 6px 10px; }
+    .history-toolbar .btn-danger  { font-size: 12px; padding: 6px 10px; margin-left: auto; }
+
+    /* ── History card rows ───────────────────────────────── */
+    .hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .hist-row {
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 2px 10px; align-items: start;
+    }
+    .hist-row.estimated {
+      background: color-mix(in srgb, var(--amber-light) 40%, var(--surface));
+      border-left: 3px solid var(--amber);
+      padding-left: 11px;
+    }
+    .hist-main { font-size: 14px; font-weight: 600; }
+    .hist-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .hist-actions { display: flex; gap: 5px; align-items: center; padding-top: 2px; }
+    .hist-badge { margin-top: 4px; }
+
+    /* ── Badges ─────────────────────────────────────────── */
+    .badge       { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .badge-good  { background: var(--teal-light);   color: var(--teal-dark); }
+    .badge-avg   { background: var(--amber-light);  color: var(--amber-dark); }
+    .badge-bad   { background: var(--red-light);    color: var(--red-dark); }
+    .badge-maint { background: var(--bg); color: var(--text); border: 1px solid var(--border-s); }
+    .badge-est   { background: var(--amber-light);  color: var(--amber-dark); font-style: italic; }
+
+    /* ── Gap modal stepper ───────────────────────────────── */
+    .gap-info {
+      background: var(--bg); border-radius: var(--radius-sm);
+      padding: 12px 14px; margin-bottom: 1rem; font-size: 13px; line-height: 1.6;
+    }
+    .gap-counter {
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; margin: 1rem 0;
+    }
+    .gap-counter button {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border-s); background: var(--surface);
+      font-size: 22px; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .gap-counter .gap-num {
+      font-size: 32px; font-weight: 700; min-width: 40px; text-align: center;
+    }
+
+    /* ── CSV fallback ───────────────────────────────────── */
+    .csv-output, .oil-csv-output, .maint-csv-output { display: none; margin-top: 0.85rem; }
+    .csv-output textarea, .oil-csv-output textarea, .maint-csv-output textarea {
+      width: 100%; height: 110px; font-family: monospace; font-size: 11px;
+      padding: 8px; border: 1px solid var(--border-s); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--text); resize: vertical;
+    }
+    .csv-hint { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+
+    /* ── Accessible off-screen labels ───────────────────── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── Settings button + backup dot ───────────────────── */
+    .settings-btn {
+      background: none; border: none; font-size: 20px; cursor: pointer;
+      padding: 2px 4px; color: var(--muted); position: relative;
+    }
+    .settings-btn .backup-dot {
+      position: absolute; top: 0; right: 0;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--amber); border: 2px solid var(--surface); display: none;
+    }
+    .settings-btn.backup-due .backup-dot { display: block; }
+
+    /* ── Ad banner ──────────────────────────────────────── */
+    .ad-banner {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      align-items: center; justify-content: center; z-index: 30; text-align: center;
+    }
+    .ad-banner.visible { display: flex; }
+    body.ads-active main { padding-bottom: 80px; }
+
+    /* ── Toast ──────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+      background: #1a1a1a; color: #fff; padding: 10px 20px;
+      border-radius: 20px; font-size: 14px; font-weight: 500;
+      opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── Empty state ────────────────────────────────────── */
+    .empty { text-align: center; padding: 2rem 1rem; color: var(--hint); font-size: 14px; }
+
+    /* ── Modals (bottom sheet) ──────────────────────────── */
+    .modal-bg {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 50;
+      align-items: flex-end; justify-content: center; padding: 0;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+      padding: 1.1rem 1rem 2rem; width: 100%; max-width: 560px;
+      max-height: 92vh; overflow-y: auto;
+    }
+    .modal-handle { width: 36px; height: 4px; background: var(--border-s); border-radius: 2px; margin: 0 auto 0.75rem; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .modal-header .modal-title { margin-bottom: 0; }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 1rem; }
+    .modal-close { background: none; border: none; font-size: 22px; line-height: 1; color: var(--hint); cursor: pointer; padding: 0 2px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 1rem; }
+    .modal-actions .btn-primary { flex: 1; margin-top: 0; }
+    .modal-actions .btn-outline  { padding: 13px 18px; }
+    .modal-bg.confirm-modal .modal { border-radius: var(--radius); max-width: 320px; text-align: center; margin: auto; }
+
+    /* ── Action row (cars modal) ────────────────────────── */
+    .action-row { display: flex; gap: 8px; margin-top: 0.85rem; flex-wrap: wrap; }
+
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="header-top">
+    <div class="logo">fuel<span>log</span></div>
+    <button class="car-switcher" id="car-switcher-btn" onclick="openCarsModal()" title="Switch car">
+      <span>🚗</span>
+      <span class="car-name" id="car-switcher-name">My Car</span>
+      <span class="car-caret" aria-hidden="true">▼</span>
+    </button>
+    <button class="settings-btn" id="settings-btn" onclick="openSettings()" title="Unit settings">⚙️<span class="backup-dot" aria-hidden="true"></span></button>
+  </div>
+  <nav>
+    <button class="active" id="nav-dash" onclick="showPage(&#39;dash&#39;)" aria-current="page">📊 Dashboard</button>
+    <button id="nav-fuel" onclick="showPage(&#39;fuel&#39;)" aria-current="false">⛽ Fuel</button>
+    <button id="nav-oil" onclick="showPage(&#39;oil&#39;)" aria-current="false">🛢 Oil</button>
+    <button id="nav-maint" onclick="showPage(&#39;maint&#39;)" aria-current="false">🔧 Maintenance</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ══════════ DASHBOARD ══════════ -->
+  <div id="page-dash" class="page active">
+
+    <!-- Oil alert banner — shown when service is due -->
+    <div class="oil-alert" id="oil-alert" style="display:none"></div>
+
+    <!-- 1. Key numbers — first thing user sees -->
+    <div class="data-grid">
+      <div class="data-card"><div class="lbl" id="lbl-m-kml">Avg economy</div><div class="val" id="m-kml">--</div></div>
+      <div class="data-card"><div class="lbl" id="lbl-m-ppl">Avg price / L</div><div class="val" id="m-ppl">--</div></div>
+      <div class="data-card"><div class="lbl" id="lbl-m-cphk">Cost / 100 km</div><div class="val" id="m-cphk">--</div></div>
+      <div class="data-card"><div class="lbl">Total spent</div><div class="val" id="m-spent">--</div></div>
+    </div>
+
+    <!-- 2. Oil status — only shown when oil data exists -->
+    <div id="oil-status-section" style="display:none">
+      <div class="data-grid">
+        <div class="data-card" data-accent="teal" id="oil-km-card">
+          <div class="lbl" id="oil-km-lbl">km until next change</div>
+          <div class="val" id="oil-km-val">--</div>
+          <div class="sub" id="oil-km-sub"></div>
+        </div>
+        <div class="data-card" data-accent="teal" id="oil-date-card">
+          <div class="lbl">Days until next change</div>
+          <div class="val" id="oil-date-val">--</div>
+          <div class="sub" id="oil-date-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Cost breakdown -->
+    <div class="section-title" id="cpkm-section-title">Cost per km</div>
+    <div class="card" id="cpkm-card">
+      <div class="cpkm-header">
+        <div class="range-pills">
+          <button class="range-pill active" data-range="all" onclick="setCpkmRange(&#39;all&#39;)" aria-pressed="true">All time</button>
+          <button class="range-pill" data-range="year" onclick="setCpkmRange(&#39;year&#39;)" aria-pressed="false">This year</button>
+          <button class="range-pill" data-range="6m" onclick="setCpkmRange(&#39;6m&#39;)" aria-pressed="false">6 mo</button>
+          <button class="range-pill" data-range="3m" onclick="setCpkmRange(&#39;3m&#39;)" aria-pressed="false">3 mo</button>
+          <button class="range-pill" data-range="custom" onclick="setCpkmRange(&#39;custom&#39;)" aria-pressed="false">Custom</button>
+        </div>
+      </div>
+      <div class="cpkm-custom-dates" id="cpkm-custom-dates">
+        <input type="date" id="cpkm-from" onchange="renderCostPerKm()">
+        <span>to</span>
+        <input type="date" id="cpkm-to" onchange="renderCostPerKm()">
+      </div>
+      <div id="cpkm-rows"><div class="empty" style="padding:1rem 0">No fuel data in this date range.</div></div>
+    </div>
+
+    <!-- 4. Trends -->
+    <div class="section-title">Trends</div>
+
+    <div class="card">
+      <div class="chart-header">
+        <span class="chart-label" id="kml-chart-title">Economy</span>
+        <label for="kml-count" class="sr-only">Number of km/L entries to show</label>
+        <select class="chart-select" id="kml-count" onchange="renderDash()" aria-label="Number of km/L entries to show">
+          <option value="10">Last 10</option>
+          <option value="20">Last 20</option>
+          <option value="0">All</option>
+        </select>
+      </div>
+      <div class="chart-scroll"><div class="chart-wrap" id="chart-kml"><div style="color:var(--hint);font-size:13px;padding:1rem 0">Add fillups to see charts.</div></div></div>
+      <div class="chart-legend" id="kml-legend">Striped bars = estimated entries</div>
+    </div>
+
+    <div class="card">
+      <div class="chart-header">
+        <span class="chart-label" id="ppl-chart-title">Fuel price</span>
+        <label for="ppl-count" class="sr-only">Number of price/L entries to show</label>
+        <select class="chart-select" id="ppl-count" onchange="renderDash()" aria-label="Number of price/L entries to show">
+          <option value="10">Last 10</option>
+          <option value="20">Last 20</option>
+          <option value="0">All</option>
+        </select>
+      </div>
+      <div class="chart-scroll"><div class="chart-wrap" id="chart-ppl"></div></div>
+      <div class="chart-legend" id="ppl-legend">Striped bars = estimated entries</div>
+    </div>
+
+    <div class="card" id="oil-chart-card" style="display:none">
+      <div class="chart-header">
+        <span class="chart-label" id="oil-chart-title">Oil intervals</span>
+        <label for="oil-chart-count" class="sr-only">Number of oil change intervals to show</label>
+        <select class="chart-select" id="oil-chart-count" onchange="renderDash()" aria-label="Number of oil change intervals to show">
+          <option value="10">Last 10</option>
+          <option value="20">Last 20</option>
+          <option value="0">All</option>
+        </select>
+      </div>
+      <div class="chart-scroll"><div class="chart-wrap" id="chart-oil"></div></div>
+    </div>
+
+    <!-- 5. All-time stats -->
+    <div class="section-title">All-time</div>
+    <div class="card">
+      <div id="stat-rows"><div class="empty">No fuel data yet.</div></div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════ FUEL PAGE ══════════ -->
+  <div id="page-fuel" class="page">
+
+    <div class="card">
+      <div class="form-grid">
+        <div class="field form-full"><label>Date</label><input type="date" id="f-date"></div>
+        <div class="field"><label id="lbl-odo">Odometer (km)</label><input type="number" id="f-odo" min="0" placeholder="84210" step="0.1"></div>
+        <div class="field"><label id="lbl-litres">Litres filled</label><input type="number" id="f-litres" placeholder="48.5" step="0.01"></div>
+        <div class="field"><label>Total cost ($)</label><input type="number" id="f-total" placeholder="81.36" step="0.01"></div>
+        <div class="field"><label id="lbl-pph">Price / L <span style="font-weight:400;color:var(--hint)">auto</span></label><input type="number" id="f-ppl" placeholder="calculated" step="0.001" readonly=""></div>
+        <div class="field form-full"><label>Note (optional)</label><input type="text" id="f-note" placeholder="Highway, winter blend…"></div>
+      </div>
+      <button class="btn-primary" onclick="saveFillup()">Save fillup ⛽</button>
+    </div>
+
+    <div class="history-toolbar">
+        <button class="btn-outline" onclick="exportCSV()">⬇ Export</button>
+        <button class="btn-outline" onclick="document.getElementById('import-file').click()">⬆ Import</button>
+        <input type="file" id="import-file" accept=".csv" style="display:none" onchange="importCSV(this)">
+        <button class="btn-danger" onclick="deleteAll()">Delete all</button>
+      </div>
+      <div class="hist-list" id="log-body"></div>
+      <div id="log-empty" class="empty" style="display:none">No fillups yet — add your first one above!</div>
+      <div class="csv-output" id="csv-output">
+        <div class="csv-hint">Copy text below and save as .csv file.</div>
+        <textarea id="csv-text" readonly="" onclick="this.select()"></textarea>
+        <button class="btn-outline" style="margin-top:8px;width:100%" onclick="document.getElementById('csv-output').style.display='none'">Dismiss</button>
+      </div>
+
+  </div>
+
+
+  <!-- ══════════ OIL PAGE ══════════ -->
+  <div id="page-oil" class="page">
+
+    <div class="card">
+      <div class="form-grid">
+        <div class="field form-full"><label>Date</label><input type="date" id="o-date"></div>
+        <div class="field"><label>Odometer (km)</label><input type="number" id="o-odo" min="0" placeholder="84210" step="0.1"></div>
+        <div class="field"><label>Cost ($)</label><input type="number" id="o-cost" placeholder="65.00" step="0.01"></div>
+        <div class="field"><label>Oil brand / viscosity</label><input type="text" id="o-oil" placeholder="Mobil 1 5W-30"></div>
+        <div class="field"><label>Filter brand</label><input type="text" id="o-filter" placeholder="Fram PH3614"></div>
+        <div class="field"><label>Next change due (km)</label><input type="number" id="o-next-km" placeholder="89210" step="1"></div>
+        <div class="field"><label>Next change due (date)</label><input type="date" id="o-next-date"></div>
+        <div class="field form-full"><label>Notes (optional)</label><input type="text" id="o-note" placeholder="DIY, dealer, etc."></div>
+      </div>
+      <button class="btn-primary" onclick="saveOilChange()">Save oil change 🛢</button>
+    </div>
+
+    <div class="history-toolbar">
+        <button class="btn-outline" onclick="exportOilCSV()">⬇ Export</button>
+        <button class="btn-outline" onclick="document.getElementById('oil-import-file').click()">⬆ Import</button>
+        <input type="file" id="oil-import-file" accept=".csv" style="display:none" onchange="importOilCSV(this)">
+        <button class="btn-danger" onclick="deleteAllOil()">Delete all</button>
+      </div>
+      <div class="hist-list" id="oil-body"></div>
+      <div id="oil-empty" class="empty" style="display:none">No oil changes logged yet.</div>
+      <div class="oil-csv-output" id="oil-csv-output">
+        <div class="csv-hint">Copy text below and save as .csv file.</div>
+        <textarea id="oil-csv-text" readonly="" onclick="this.select()"></textarea>
+        <button class="btn-outline" style="margin-top:8px;width:100%" onclick="document.getElementById('oil-csv-output').style.display='none'">Dismiss</button>
+      </div>
+
+  </div>
+
+
+  <!-- ══════════ MAINTENANCE PAGE ══════════ -->
+  <div id="page-maint" class="page">
+
+    <div class="card">
+      <div class="form-grid">
+        <div class="field form-full"><label>Date</label><input type="date" id="mt-date"></div>
+        <div class="field form-full">
+          <label>Type</label>
+          <select class="form-select" id="mt-type">
+            <option value="">Select type…</option>
+            <option>Tires</option>
+            <option>Brakes</option>
+            <option>Battery</option>
+            <option>Air filter</option>
+            <option>Cabin filter</option>
+            <option>Spark plugs</option>
+            <option>Transmission fluid</option>
+            <option>Coolant flush</option>
+            <option>Alignment</option>
+            <option>Inspection / Registration</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Odometer (km)</label><input type="number" id="mt-odo" min="0" placeholder="84210" step="0.1"></div>
+        <div class="field"><label>Cost ($)</label><input type="number" id="mt-cost" placeholder="120.00" step="0.01"></div>
+        <div class="field form-full"><label>Description / Note</label><input type="text" id="mt-note" placeholder="Replaced front brake pads…"></div>
+      </div>
+      <button class="btn-primary" onclick="saveMaint()">Save maintenance 🔧</button>
+    </div>
+
+    <div class="history-toolbar">
+        <button class="btn-outline" onclick="exportMaintCSV()">⬇ Export</button>
+        <button class="btn-outline" onclick="document.getElementById('maint-import-file').click()">⬆ Import</button>
+        <input type="file" id="maint-import-file" accept=".csv" style="display:none" onchange="importMaintCSV(this)">
+        <button class="btn-danger" onclick="deleteAllMaint()">Delete all</button>
+      </div>
+      <div class="hist-list" id="maint-body"></div>
+      <div id="maint-empty" class="empty" style="display:none">No maintenance logged yet.</div>
+      <div class="maint-csv-output" id="maint-csv-output">
+        <div class="csv-hint">Copy text below and save as .csv file.</div>
+        <textarea id="maint-csv-text" readonly="" onclick="this.select()"></textarea>
+        <button class="btn-outline" style="margin-top:8px;width:100%" onclick="document.getElementById('maint-csv-output').style.display='none'">Dismiss</button>
+      </div>
+
+  </div>
+
+</main>
+
+
+<!-- ════ SETTINGS MODAL ════ -->
+<!-- ════ CARS MODAL (opened by car switcher pill) ════ -->
+<div class="modal-bg" id="cars-modal" onclick="if(event.target===this)closeCarsModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">🚗 Your cars</div><button class="modal-close" onclick="closeCarsModal()" aria-label="Close">×</button></div>
+
+    <div id="settings-car-list" style="margin-bottom:0.75rem"></div>
+
+    <div class="action-row" style="margin-top:0;margin-bottom:0.75rem">
+      <button class="btn-outline" style="color:var(--teal);border-color:var(--teal)" onclick="closeCarsModal();openAddCar()">+ Add a car</button>
+      <button class="btn-outline" onclick="exportCarsCSV()">⬇ Export</button>
+      <button class="btn-outline" onclick="document.getElementById('cars-import-file').click()">⬆ Import</button>
+      <input type="file" id="cars-import-file" accept=".csv" style="display:none" onchange="importCarsCSV(this)">
+    </div>
+    <div id="cars-csv-output" style="display:none;margin-bottom:0.75rem">
+      <div class="csv-hint">Copy text below and save as .csv file.</div>
+      <textarea id="cars-csv-text" readonly onclick="this.select()" style="width:100%;height:80px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border-s);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);resize:vertical"></textarea>
+      <button class="btn-outline" style="margin-top:6px;width:100%" onclick="document.getElementById('cars-csv-output').style.display='none'">Dismiss</button>
+    </div>
+
+    <div class="modal-actions" style="margin-top:1.25rem">
+      <button class="btn-primary" onclick="closeCarsModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ SETTINGS MODAL (opened by ⚙️ button — units only) ════ -->
+<div class="modal-bg" id="settings-modal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">⚙️ Settings</div><button class="modal-close" onclick="closeSettings()" aria-label="Close">×</button></div>
+
+    <div class="section-title" style="margin-top:0">Unit system</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem">
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer">
+        <input type="radio" name="units" value="metric" onchange="setUnits('metric')" style="width:auto;accent-color:var(--teal)"> Metric (km, L, km/L)
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer">
+        <input type="radio" name="units" value="us" onchange="setUnits('us')" style="width:auto;accent-color:var(--teal)"> US Imperial (miles, US gal, MPG)
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer">
+        <input type="radio" name="units" value="uk" onchange="setUnits('uk')" style="width:auto;accent-color:var(--teal)"> UK Imperial (miles, L, MPG imp.)
+      </label>
+    </div>
+
+    <div class="section-title">Cost display</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem">
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer">
+        <input type="radio" name="costrate" value="per1" onchange="setCostRate('per1')" style="width:auto;accent-color:var(--teal)"><span id="rate-lbl-unit">Cost per km</span> <span id="rate-lbl-per1" style="color:var(--hint);font-size:12px">(e.g. $0.14/km)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer">
+        <input type="radio" name="costrate" value="per100" onchange="setCostRate('per100')" style="width:auto;accent-color:var(--teal)"><span id="rate-lbl-100">Cost per 100 km</span> <span id="rate-lbl-per100" style="color:var(--hint);font-size:12px">(e.g. $14/100 km)</span>
+      </label>
+    </div>
+
+    <div class="section-title">Data backup</div>
+    <div id="backup-status" style="font-size:13px;color:var(--muted);margin-bottom:0.75rem;min-height:18px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:0.75rem;flex-wrap:wrap">
+      <button class="btn-outline" style="flex:1;color:var(--teal);border-color:var(--teal)" onclick="exportFullBackup()">⬇ Export all data</button>
+      <button class="btn-outline" style="flex:1" onclick="document.getElementById('full-import-file').click()">⬆ Restore backup</button>
+      <input type="file" id="full-import-file" accept=".json" style="display:none" onchange="importFullBackup(this)">
+    </div>
+    <div style="font-size:12px;color:var(--hint);line-height:1.5">
+      Exports all cars, fuel, oil &amp; maintenance as a single JSON file. Use to move data to another device or as a full backup.
+    </div>
+
+    <div class="modal-actions" style="margin-top:1.25rem">
+      <button class="btn-primary" onclick="closeSettings()">Done</button>
+    </div>
+
+    <div style="text-align:center;margin-top:1rem;padding-bottom:0.25rem">
+      <a href="/privacy.html" target="_blank" rel="noopener"
+         style="font-size:12px;color:var(--hint);text-decoration:none;border-bottom:1px solid var(--border-s);padding-bottom:1px">
+        Privacy Policy
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ADD CAR MODAL ════ -->
+<div class="modal-bg" id="add-car-modal" onclick="if(event.target===this)closeAddCar()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title" id="add-car-title">Add a car</div><button class="modal-close" onclick="closeAddCar()" aria-label="Close">×</button></div>
+    <div class="form-grid">
+      <div class="field form-full"><label>Name (required)</label><input type="text" id="car-name" placeholder="My Car"></div>
+      <div class="field"><label>Make</label><input type="text" id="car-make" placeholder="Toyota"></div>
+      <div class="field"><label>Model</label><input type="text" id="car-model" placeholder="Corolla"></div>
+      <div class="field"><label>Year</label><input type="number" id="car-year" placeholder="2020"></div>
+      <div class="field"><label>Colour</label><input type="text" id="car-colour" placeholder="Blue"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeAddCar()">Cancel</button>
+      <button class="btn-primary" onclick="saveNewCar()">Save car 🚗</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDIT FUEL MODAL ════ -->
+<div class="modal-bg" id="edit-modal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">Edit fillup</div><button class="modal-close" onclick="closeEditModal()" aria-label="Close">×</button></div>
+    <div class="form-grid">
+      <div class="field form-full"><label>Date</label><input type="date" id="e-date"></div>
+      <div class="field"><label>Odometer (km)</label><input type="number" id="e-odo" min="0" step="0.1"></div>
+      <div class="field"><label>Litres filled</label><input type="number" id="e-litres" step="0.01"></div>
+      <div class="field"><label>Total cost ($)</label><input type="number" id="e-total" step="0.01"></div>
+      <div class="field"><label>Price / L ($)</label><input type="number" id="e-ppl" step="0.001"></div>
+      <div class="field form-full"><label>Note</label><input type="text" id="e-note"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDIT OIL MODAL ════ -->
+<div class="modal-bg" id="oil-edit-modal" onclick="if(event.target===this)closeOilEditModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">Edit oil change</div><button class="modal-close" onclick="closeOilEditModal()" aria-label="Close">×</button></div>
+    <div class="form-grid">
+      <div class="field form-full"><label>Date</label><input type="date" id="oe-date"></div>
+      <div class="field"><label>Odometer (km)</label><input type="number" id="oe-odo" min="0" step="0.1"></div>
+      <div class="field"><label>Cost ($)</label><input type="number" id="oe-cost" step="0.01"></div>
+      <div class="field"><label>Oil brand / viscosity</label><input type="text" id="oe-oil"></div>
+      <div class="field"><label>Filter brand</label><input type="text" id="oe-filter"></div>
+      <div class="field"><label>Next change due (km)</label><input type="number" id="oe-next-km" step="1"></div>
+      <div class="field"><label>Next change due (date)</label><input type="date" id="oe-next-date"></div>
+      <div class="field form-full"><label>Notes</label><input type="text" id="oe-note"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeOilEditModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveOilEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDIT MAINTENANCE MODAL ════ -->
+<div class="modal-bg" id="maint-edit-modal" onclick="if(event.target===this)closeMaintEditModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">Edit maintenance</div><button class="modal-close" onclick="closeMaintEditModal()" aria-label="Close">×</button></div>
+    <div class="form-grid">
+      <div class="field form-full"><label>Date</label><input type="date" id="me-date"></div>
+      <div class="field form-full">
+        <label>Type</label>
+        <select class="form-select" id="me-type">
+          <option value="">Select type…</option>
+          <option>Tires</option><option>Brakes</option><option>Battery</option>
+          <option>Air filter</option><option>Cabin filter</option><option>Spark plugs</option>
+          <option>Transmission fluid</option><option>Coolant flush</option>
+          <option>Alignment</option><option>Inspection / Registration</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Odometer (km)</label><input type="number" id="me-odo" min="0" step="0.1"></div>
+      <div class="field"><label>Cost ($)</label><input type="number" id="me-cost" step="0.01"></div>
+      <div class="field form-full"><label>Description / Note</label><input type="text" id="me-note"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeMaintEditModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveMaintEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ GAP MODAL — shown after saving a fillup when a large gap is detected ════ -->
+<div class="modal-bg" id="gap-modal" onclick="if(event.target===this)dismissGap()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚠️ Large gap detected</div>
+    <div class="gap-info" id="gap-info-text"></div>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:0.5rem">How many fillups did you miss?</p>
+    <div class="gap-counter">
+      <button onclick="adjustGap(-1)" aria-label="Decrease count">−</button>
+      <div class="gap-num" id="gap-num">1</div>
+      <button onclick="adjustGap(1)" aria-label="Increase count">+</button>
+    </div>
+    <p style="font-size:12px;color:var(--hint);margin-bottom:1rem;text-align:center" id="gap-estimate-text"></p>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="dismissGap()">No missed fillups</button>
+      <button class="btn-primary" onclick="confirmGap()">Insert estimates</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ CONFIRM MODAL ════ -->
+<div class="modal-bg confirm-modal" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="confirm-title">Delete?</div>
+    <p id="confirm-body" style="font-size:14px;color:var(--muted);margin-bottom:1.25rem">This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn-outline" style="flex:1" onclick="closeConfirmModal()">Cancel</button>
+      <button class="btn-primary" style="background:var(--red-dark);flex:1;margin-top:0" id="confirm-yes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+
+<script>
+
+  // ══════════════════════════════════════════════════════
+  // AD CONFIGURATION
+  // When your AdSense account is approved:
+  //   1. Uncomment the <script> and <ins> tags in the ad-banner HTML above
+  //   2. Replace YOUR_PUBLISHER_ID with your ca-pub-XXXXXXXXXXXXXXXX number
+  //   3. Replace YOUR_AD_SLOT_ID with your ad unit slot ID
+  //   4. Set AD_ENABLED = true below
+  // ══════════════════════════════════════════════════════
+  var AD_ENABLED = false; // ← flip to true when AdSense is approved
+
+  function initAds() {
+    if (!AD_ENABLED) return;
+
+    var banner = document.getElementById('ad-banner');
+    banner.classList.add('visible');
+    document.body.classList.add('ads-active');
+
+    // Move the toast up so it doesn't hide behind the banner
+    var toast = document.getElementById('toast');
+    if (toast) toast.style.bottom = '72px';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // UNIT SYSTEMS
+  // Metric: km, L, km/L, $/L
+  // US:     miles, US gal (× 0.264172), MPG-US, $/gal
+  // UK:     miles, L, MPG-imp (× 1.20095), $/L
+  // ══════════════════════════════════════════════════════
+  // Storage keys
+  var FUEL_KEY     = 'fuellog_entries';
+  var OIL_KEY      = 'fuellog_oil_changes';
+  var MAINT_KEY    = 'fuellog_maintenance';
+  var SETTINGS_KEY = 'fuellog_settings';
+
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch(e) { return {}; }
+  }
+  function saveSettings_(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+  function getUnits() { return loadSettings().units || 'metric'; }
+
+  // Labels per unit system
+  var UNIT_CFG = {
+    metric: { dist:'km',  vol:'L',    volShort:'L',   eff:'km/L',   effLabel:'km/L',   price:'$/L',    volFactor:1,       distFactor:1,       effFactor:1,       volDec:3, effDec:2, oPlaceholder:'84210', lPlaceholder:'48.5', totalPlaceholder:'81.36', pricePlaceholder:'1.219', effMetric:'m-kml', eff100Label:'Fuel cost/100 km' },
+    us:     { dist:'mi',  vol:'gal',  volShort:'gal', eff:'MPG',    effLabel:'MPG',    price:'$/gal',  volFactor:0.264172,distFactor:0.621371,effFactor:2.35215, volDec:3, effDec:1, oPlaceholder:'52350', lPlaceholder:'12.8', totalPlaceholder:'55.20', pricePlaceholder:'4.31',  effMetric:'m-mpg', eff100Label:'Fuel cost/100 mi' },
+    uk:     { dist:'mi',  vol:'L',    volShort:'L',   eff:'MPG',    effLabel:'MPG',    price:'£/L',    volFactor:1,       distFactor:0.621371,effFactor:2.82481, volDec:3, effDec:1, oPlaceholder:'52350', lPlaceholder:'48.5', totalPlaceholder:'68.00', pricePlaceholder:'1.50',  effMetric:'m-mpg', eff100Label:'Fuel cost/100 mi' },
+  };
+
+  function U() { return UNIT_CFG[getUnits()] || UNIT_CFG.metric; }
+
+  // Convert a stored km/L value to display efficiency for the active unit
+  function toDisplayEff(kml) {
+    if (isNaN(kml) || kml===null) return NaN;
+    return kml * U().effFactor;
+  }
+
+  // Returns true when we should show L/100km instead of km/L
+  // Only for metric units when the user has chosen "per 100" cost display
+  function useL100() {
+    return getUnits() === 'metric' && getCostRate() === 'per100';
+  }
+
+  // Economy value to display — km/L or L/100km depending on mode
+  function dispEff(kml) {
+    if (isNaN(kml) || kml === null || kml === 0) return NaN;
+    return useL100() ? (100 / kml) : toDisplayEff(kml);
+  }
+
+  // Formatted efficiency string with unit label
+  function fmtEff(kml, decimals) {
+    var v = dispEff(kml);
+    if (isNaN(v)) return '--';
+    return fmt(v, decimals !== undefined ? decimals : 1) + ' ' + effLabel();
+  }
+
+  // The right efficiency label for the current mode
+  function effLabel() {
+    return useL100() ? 'L/100km' : U().effLabel;
+  }
+
+  // For badge comparisons: higher is better for km/L and MPG, LOWER is better for L/100km
+  function effBetter(a, b) {
+    return useL100() ? a < b : a > b;  // a better than b
+  }
+  // Convert stored litres to display volume
+  function toDisplayVol(l) { return l * U().volFactor; }
+  // Convert stored km to display distance
+  function toDisplayDist(km) { return km * U().distFactor; }
+
+  function setUnits(u) {
+    var s = loadSettings(); s.units = u; saveSettings_(s);
+    costRate = getCostRate();
+    updateUnitLabels();
+    // Update cost display labels in settings modal if open
+    var uu = U();
+    setText('rate-lbl-per1',   '(e.g. $0.14/'+uu.dist+')');
+    setText('rate-lbl-per100', '(e.g. $14/100 '+uu.dist+')');
+    // Also update the cost-display radio label text in the modal
+    var r1 = document.querySelector('input[name="costrate"][value="per1"]');
+    var r100 = document.querySelector('input[name="costrate"][value="per100"]');
+    if (r1 && r1.parentElement) {
+      r1.parentElement.childNodes[1].textContent = 'Cost per '+uu.dist;
+    }
+    if (r100 && r100.parentElement) {
+      r100.parentElement.childNodes[1].textContent = 'Cost per 100 '+uu.dist;
+    }
+    renderDash();
+    renderHistory();
+    renderOilHistory();
+    renderMaintHistory();
+  }
+
+  // Update all static labels in the HTML that depend on the unit system
+  function updateUnitLabels() {
+    var u = U();
+    // Form labels
+    setText('lbl-odo',    'Odometer ('+u.dist+')');
+    setText('lbl-litres', 'Volume ('+u.vol+')');
+    setText('lbl-pph',    'Price / '+u.volShort+' <span style="font-weight:400;color:var(--hint)">auto</span>');
+    // Cost rate labels
+    setText('rate-lbl-unit',   'Cost per '+u.dist);
+    setText('rate-lbl-100',    'Cost per 100 '+u.dist);
+    setText('rate-lbl-per1',   '(e.g. $0.14/'+u.dist+')');
+    setText('rate-lbl-per100', '(e.g. $14/100 '+u.dist+')');
+    // Economy metric label reflects current display mode
+    setText('lbl-m-kml', 'Avg economy');
+    setText('lbl-m-cphk', 'Fuel cost / 100 '+u.dist);
+    setText('lbl-m-ppl',  'Avg price / '+u.volShort);
+    // Chart titles (updated by renderDash too, but set defaults here)
+    // Placeholders
+    setPlaceholder('f-odo',    u.oPlaceholder);
+    setPlaceholder('f-litres', u.lPlaceholder);
+    setPlaceholder('f-total',  u.totalPlaceholder);
+    setPlaceholder('f-ppl',    u.pricePlaceholder);
+    setPlaceholder('e-odo',    u.oPlaceholder);
+    setPlaceholder('o-odo',    u.oPlaceholder);
+    setPlaceholder('mt-odo',   u.oPlaceholder);
+    // Section titles with unit references
+    setText('cpkm-section-title', 'Cost per '+u.dist);
+    setText('oil-km-lbl', u.dist+' until next change');
+    // Radio button
+    document.querySelectorAll('input[name="units"]').forEach(function(r){
+      r.checked = r.value === getUnits();
+    });
+  }
+
+  function setText(id, html) { var el=document.getElementById(id); if(el) el.innerHTML=html; }
+  function setPlaceholder(id, val) { var el=document.getElementById(id); if(el) el.placeholder=val; }
+
+
+  // ══════════════════════════════════════════════════════
+  // CARS
+  // ══════════════════════════════════════════════════════
+  var CARS_KEY = 'fuellog_cars';
+  var ACTIVE_CAR_KEY = 'fuellog_active_car';
+
+  function loadCars() {
+    try { return JSON.parse(localStorage.getItem(CARS_KEY)) || []; } catch(e) { return []; }
+  }
+  function saveCars(c) { localStorage.setItem(CARS_KEY, JSON.stringify(c)); }
+
+  function getActiveCarId() {
+    var id = localStorage.getItem(ACTIVE_CAR_KEY);
+    var cars = loadCars();
+    // If no car selected or selected car was deleted, use the first car
+    if (!id || !cars.find(function(c){ return c.id === id; })) {
+      return cars.length ? cars[0].id : null;
+    }
+    return id;
+  }
+
+  function setActiveCarId(id) { localStorage.setItem(ACTIVE_CAR_KEY, id); }
+
+  // Return car-scoped storage keys
+  function carKey(base, carId) {
+    var id = carId || getActiveCarId();
+    return id ? base + '_car_' + id : base; // fallback to legacy key if no car
+  }
+
+  function loadEntries(carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(FUEL_KEY, resolvedId) : FUEL_KEY;
+    try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; }
+  }
+  function saveEntries(d, carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(FUEL_KEY, resolvedId) : FUEL_KEY;
+    localStorage.setItem(key, JSON.stringify(d));
+  }
+  function loadOilChanges(carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(OIL_KEY, resolvedId) : OIL_KEY;
+    try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; }
+  }
+  function saveOilChanges(d, carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(OIL_KEY, resolvedId) : OIL_KEY;
+    localStorage.setItem(key, JSON.stringify(d));
+  }
+  function loadMaint(carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(MAINT_KEY, resolvedId) : MAINT_KEY;
+    try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; }
+  }
+  function saveMaint_(d, carId) {
+    var resolvedId = carId || getActiveCarId();
+    var key = resolvedId ? carKey(MAINT_KEY, resolvedId) : MAINT_KEY;
+    localStorage.setItem(key, JSON.stringify(d));
+  }
+
+  // Update the car switcher pill in the header to show the active car name
+  function renderCarSwitcher() {
+    var cars    = loadCars();
+    var activeId = getActiveCarId();
+    var active  = cars.find(function(c){ return c.id === activeId; });
+    var nameEl  = document.getElementById('car-switcher-name');
+    if (nameEl) {
+      nameEl.textContent = active ? active.name : (cars.length ? 'Select car' : 'Add a car');
+    }
+  }
+
+  function switchCar(id) {
+    setActiveCarId(id);
+    renderCarSwitcher();
+    renderSettingsCarList();
+    renderDash();
+    renderHistory();
+    renderOilHistory();
+    renderMaintHistory();
+  }
+
+  // Settings modal — list cars with a delete button each
+  function renderSettingsCarList() {
+    var cars = loadCars();
+    var activeId = getActiveCarId();
+    var el = document.getElementById('settings-car-list');
+    if (!cars.length) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--hint);margin-bottom:0.5rem">No cars added yet.</div>';
+      return;
+    }
+    el.innerHTML = cars.map(function(c) {
+      var sub = [c.year, c.make, c.model, c.colour].filter(Boolean).join(' · ');
+      var isActive = c.id === activeId;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:14px;font-weight:600">'+(isActive?'🚗 ':'')+c.name+'</div>'+
+          (sub ? '<div style="font-size:12px;color:var(--muted)">'+sub+'</div>' : '')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;flex-shrink:0">'+
+          (!isActive ? '<button class="btn-sm" style="color:var(--teal);border-color:var(--teal)" onclick="switchCar(\''+c.id+'\')">Use</button>' : '')+
+          '<button class="btn-sm" onclick="openEditCar(\''+c.id+'\')">Edit</button>'+
+          '<button class="btn-sm" style="color:var(--red-dark);border-color:var(--red-dark)" onclick="deleteCar(\''+c.id+'\')">Delete</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // Cars modal — opened by the car switcher pill
+  function openCarsModal() {
+    renderSettingsCarList();
+    document.getElementById('cars-modal').classList.add('open');
+  }
+  function closeCarsModal() {
+    document.getElementById('cars-modal').classList.remove('open');
+  }
+
+  // Settings modal — opened by ⚙️, units only
+  function openSettings() {
+    var u = U();
+    var cr = getCostRate();
+    // Sync unit radios
+    document.querySelectorAll('input[name="units"]').forEach(function(r){ r.checked = r.value === getUnits(); });
+    // Sync cost rate radios
+    document.querySelectorAll('input[name="costrate"]').forEach(function(r){ r.checked = r.value === cr; });
+    // Update example labels to show active unit
+    setText('rate-lbl-per1',   '(e.g. $0.14/'+u.dist+')');
+    setText('rate-lbl-per100', '(e.g. $14/100 '+u.dist+')');
+    checkBackupReminder();
+    document.getElementById('settings-modal').classList.add('open');
+  }
+  function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+
+  var editingCarId = null;
+
+  function openAddCar() {
+    editingCarId = null;
+    document.getElementById('add-car-title').textContent = 'Add a car';
+    ['car-name','car-make','car-model','car-year','car-colour'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('add-car-modal').classList.add('open');
+  }
+
+  function openEditCar(id) {
+    var car = loadCars().find(function(c){ return c.id === id; });
+    if (!car) return;
+    editingCarId = id;
+    document.getElementById('add-car-title').textContent = 'Edit car';
+    document.getElementById('car-name').value   = car.name   || '';
+    document.getElementById('car-make').value   = car.make   || '';
+    document.getElementById('car-model').value  = car.model  || '';
+    document.getElementById('car-year').value   = car.year   || '';
+    document.getElementById('car-colour').value = car.colour || '';
+    document.getElementById('add-car-modal').classList.add('open');
+  }
+
+  function closeAddCar() { document.getElementById('add-car-modal').classList.remove('open'); editingCarId = null; }
+
+  function saveNewCar() {
+    var name = document.getElementById('car-name').value.trim();
+    if (!name) { toast('Please give the car a name.'); return; }
+    var cars = loadCars();
+
+    if (editingCarId) {
+      // Editing existing car — update in place
+      var idx = cars.findIndex(function(c){ return c.id === editingCarId; });
+      if (idx !== -1) {
+        cars[idx] = Object.assign({}, cars[idx], {
+          name:   name,
+          make:   document.getElementById('car-make').value.trim(),
+          model:  document.getElementById('car-model').value.trim(),
+          year:   document.getElementById('car-year').value.trim(),
+          colour: document.getElementById('car-colour').value.trim()
+        });
+        saveCars(cars);
+        closeAddCar();
+        renderSettingsCarList();
+        renderCarSwitcher();
+        toast('Car updated! 🚗');
+      }
+      return;
+    }
+
+    // Adding new car
+    var newCar = {
+      id:     makeId(),
+      name:   name,
+      make:   document.getElementById('car-make').value.trim(),
+      model:  document.getElementById('car-model').value.trim(),
+      year:   document.getElementById('car-year').value.trim(),
+      colour: document.getElementById('car-colour').value.trim()
+    };
+    cars.push(newCar);
+    saveCars(cars);
+    // If this is the first car, migrate any legacy data to its key
+    if (cars.length === 1) { migrateLegacyData(newCar.id); }
+    setActiveCarId(newCar.id);
+    closeAddCar();
+    renderCarSwitcher();
+    renderDash();
+    toast('Car added! 🚗');
+  }
+
+  function deleteCar(id) {
+    var cars = loadCars().filter(function(c){ return c.id !== id; });
+    saveCars(cars);
+    // Switch to another car if we deleted the active one
+    if (getActiveCarId() === id) { setActiveCarId(cars.length ? cars[0].id : null); }
+    renderSettingsCarList();
+    renderCarSwitcher();
+    renderDash();
+    toast('Car deleted.');
+  }
+
+  // One-time migration: if the user already has data in the old (non-car) keys,
+  // copy it to the new car-scoped keys so nothing is lost.
+  function migrateLegacyData(carId) {
+    var legacyFuel  = localStorage.getItem(FUEL_KEY);
+    var legacyOil   = localStorage.getItem(OIL_KEY);
+    var legacyMaint = localStorage.getItem(MAINT_KEY);
+    if (legacyFuel)  { localStorage.setItem(FUEL_KEY+'_car_'+carId,  legacyFuel);  }
+    if (legacyOil)   { localStorage.setItem(OIL_KEY+'_car_'+carId,   legacyOil);   }
+    if (legacyMaint) { localStorage.setItem(MAINT_KEY+'_car_'+carId, legacyMaint); }
+  }
+
+
+  function makeId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return String(Date.now()) + String(Math.floor(Math.random() * 1e9));
+  }
+
+  function latestOilChange() {
+    var r = loadOilChanges();
+    if (!r.length) return null;
+    return r.slice().sort(function(a,b){ return Number(b.odo)-Number(a.odo); })[0];
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  function showPage(page) {
+    ['dash','fuel','oil','maint'].forEach(function(n) {
+      var isActive = n===page;
+      document.getElementById('page-'+n).classList.toggle('active', isActive);
+      document.getElementById('nav-'+n).classList.toggle('active', isActive);
+      document.getElementById('nav-'+n).setAttribute('aria-current', isActive ? 'page' : 'false');
+    });
+    if (page==='dash')  renderDash();
+    if (page==='fuel')  renderHistory();
+    if (page==='oil')   renderOilHistory();
+    if (page==='maint') renderMaintHistory();
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // HELPERS
+  // ══════════════════════════════════════════════════════
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(function(){ el.classList.remove('show'); }, 2200);
+  }
+
+  function fmt(n, d) { d=d===undefined?2:d; return isNaN(n)?'--':Number(n).toFixed(d); }
+
+  // Escape user-supplied text before inserting into innerHTML
+  function esc(str) {
+    return String(str||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  // Currency-aware format: uses £ for UK Imperial, $ for everything else
+  function currSym() { return getUnits()==='uk' ? '£' : '$'; }
+  function fmtC(n)   { return isNaN(n)?'--':currSym()+Number(n).toFixed(2); }
+  function fmtDate(s) {
+    var d = new Date(s+'T00:00:00');
+    return d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
+  }
+  function fmtDateShort(s) {
+    var d = new Date(s+'T00:00:00');
+    return (d.getMonth()+1)+'/'+(d.getDate());
+  }
+
+  // Attach dist and kml to each fuel entry based on odometer delta.
+  // Estimated entries still get a kml value (so they plot on the chart),
+  // but they are excluded from the average used for badge colouring.
+  function addEconomyData(entries) {
+    var sorted = entries.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    return sorted.map(function(e,i) {
+      if (i===0) return Object.assign({},e,{dist:null,kml:null});
+      var dist = Number(e.odo)-Number(sorted[i-1].odo);
+      var kml  = dist>0 ? dist/Number(e.litres) : null;
+      return Object.assign({},e,{dist:dist,kml:kml});
+    });
+  }
+
+  // Average km/L from REAL (non-estimated) entries only
+  function realAvgKml(entries) {
+    var withEco = addEconomyData(entries).filter(function(e){ return e.kml!==null && !e.estimated; });
+    if (!withEco.length) return NaN;
+    // Exclude gap entries (dist > GAP_THRESHOLD × avg dist) from the average
+    // so they don't skew badge colours for normal fillups
+    var avgDist = withEco.reduce(function(s,e){ return s+e.dist; },0) / withEco.length;
+    var clean   = withEco.filter(function(e){ return e.dist <= avgDist * GAP_THRESHOLD; });
+    var real    = clean.length ? clean : withEco; // fallback if all entries are gaps
+    return real.reduce(function(s,e){ return s+e.kml; },0) / real.length;
+  }
+
+  // Shared averages used by both the gap detector and the inline gap opener.
+  // Always computed from real (non-estimated) entries only.
+  function getRealAverages(entries) {
+    var real    = entries.filter(function(e){ return !e.estimated; });
+    var withEco = addEconomyData(real).filter(function(e){ return e.dist!==null && e.dist>0; });
+    var avgDist   = withEco.length
+      ? withEco.reduce(function(s,e){ return s+e.dist; },0) / withEco.length : 0;
+    var avgLitres = real.length
+      ? real.reduce(function(s,e){ return s+Number(e.litres); },0) / real.length : 0;
+    var avgPpl = real.length
+      ? real.reduce(function(s,e){ return s+Number(e.ppl); },0) / real.length : 0;
+    return { avgDist:avgDist, avgLitres:avgLitres, avgPpl:avgPpl };
+  }
+
+  // Build a scrollable bar chart HTML string.
+  // data: [{value, displayVal, label, color?, estimated?}]
+  // Estimated bars get a diagonal stripe + ⚠ label so they are visually distinct
+  // on any chart colour (works for both the teal km/L chart and amber price chart).
+  // Build a scrollable bar chart HTML string.
+  // invertScale: pass true for L/100km (lower value = better = taller bar)
+  function buildChart(data, floor, defaultColor, invertScale) {
+    if (!data.length) return '<div style="color:var(--hint);font-size:13px;padding:1rem 0">Not enough data yet.</div>';
+    var vals   = data.map(function(d){ return d.value; });
+    var minV   = Math.min.apply(null, vals);
+    var maxV   = Math.max.apply(null, vals);
+    var range  = maxV-minV || 0.01;
+    var fl     = floor || 15;
+    return data.map(function(d) {
+      var h = invertScale
+        ? fl + ((maxV - d.value) / range) * (92 - fl)   // lower L/100km = taller bar
+        : fl + ((d.value - minV) / range) * (92 - fl);
+      var barClass = d.estimated ? 'bar bar-estimated' : 'bar';
+      var topLabel = d.estimated
+        ? '<div class="bv-est">~est</div>'
+        : '<div class="bv">'+d.displayVal+'</div>';
+      return '<div class="bar-col">'+
+        topLabel+
+        '<div class="'+barClass+'" style="height:'+h.toFixed(0)+'%;background:'+(d.color||defaultColor||'var(--teal)')+'"></div>'+
+        '<div class="bl">'+d.label+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // Trigger a CSV download, then always show the textarea as a Firefox Android fallback
+  function triggerDownload(csv, filename, textareaId, outputId) {
+    try {
+      var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href=url; a.download=filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+    } catch(err) {}
+    setTimeout(function(){
+      document.getElementById(textareaId).value = csv;
+      document.getElementById(outputId).style.display = 'block';
+      document.getElementById(textareaId).select();
+    }, 700);
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // OIL STATUS (alert + status cards)
+  // ══════════════════════════════════════════════════════
+  function renderOilStatus() {
+    var oil        = latestOilChange();
+    var fuelRaw    = loadEntries();
+    var currentOdo = fuelRaw.length
+      ? Math.max.apply(null, fuelRaw.map(function(e){ return Number(e.odo); }))
+      : null;
+    var today = new Date(); today.setHours(0,0,0,0);
+
+    var alertEl = document.getElementById('oil-alert');
+    alertEl.className = 'oil-alert'; alertEl.style.display='none'; alertEl.innerHTML='';
+
+    var statusSection = document.getElementById('oil-status-section');
+    if (!oil) { statusSection.style.display='none'; return; }
+    statusSection.style.display='';
+
+    var messages=[], isOverdue=false;
+
+    // km card
+    var kmCard = document.getElementById('oil-km-card');
+    var kmVal  = document.getElementById('oil-km-val');
+    var kmSub  = document.getElementById('oil-km-sub');
+    kmCard.className='data-card'; kmCard.removeAttribute('data-accent');
+    if (oil.nextKm && currentOdo!==null) {
+      var kmLeft = Number(oil.nextKm)-currentOdo;
+      var kmLeftDisp = Math.abs(Math.round(toDisplayDist(kmLeft)));
+      kmVal.textContent = kmLeftDisp.toLocaleString()+' '+U().dist;
+      if (kmLeft<=0)        { kmSub.textContent='Overdue!'; kmCard.classList.add('overdue'); kmCard.setAttribute('data-accent','red'); messages.push('<strong>Oil change overdue</strong> by '+kmLeftDisp.toLocaleString()+' '+U().dist); isOverdue=true; }
+      else if (kmLeft<=500) { kmSub.textContent='Due soon';  kmCard.classList.add('warn'); kmCard.setAttribute('data-accent','amber'); messages.push('<strong>Oil change due soon</strong> — '+Math.round(toDisplayDist(kmLeft)).toLocaleString()+' '+U().dist+' left'); }
+      else                  { kmSub.textContent='Until next change'; kmCard.setAttribute('data-accent','teal'); }
+    } else { kmVal.textContent='--'; kmSub.textContent='No '+U().dist+' target set'; }
+
+    // date card
+    var dateCard = document.getElementById('oil-date-card');
+    var dateVal  = document.getElementById('oil-date-val');
+    var dateSub  = document.getElementById('oil-date-sub');
+    dateCard.className='data-card'; dateCard.removeAttribute('data-accent');
+    if (oil.nextDate) {
+      var dueDate  = new Date(oil.nextDate+'T00:00:00');
+      var daysLeft = Math.round((dueDate-today)/86400000);
+      dateVal.textContent = Math.abs(daysLeft)+(Math.abs(daysLeft)===1?' day':' days');
+      if (daysLeft<=0)        { dateSub.textContent='Overdue!'; dateCard.classList.add('overdue'); dateCard.setAttribute('data-accent','red'); messages.push('<strong>Oil date overdue</strong> by '+Math.abs(daysLeft)+' day'+(Math.abs(daysLeft)===1?'':'s')); isOverdue=true; }
+      else if (daysLeft<=14)  { dateSub.textContent='Due '+fmtDate(oil.nextDate); dateCard.classList.add('warn'); dateCard.setAttribute('data-accent','amber'); messages.push('<strong>Oil change due</strong> in '+daysLeft+' day'+(daysLeft===1?'':'s')); }
+      else                    { dateSub.textContent='Due '+fmtDate(oil.nextDate); dateCard.setAttribute('data-accent','teal'); }
+    } else { dateVal.textContent='--'; dateSub.textContent='No date target set'; }
+
+    if (messages.length) {
+      alertEl.classList.add(isOverdue?'overdue':'warn');
+      alertEl.innerHTML = messages.join('<br>')+" &nbsp;— <a href='#' onclick='showPage(\"oil\");return false'>View oil changes</a>";
+      alertEl.style.display='block';
+    }
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // COST PER KM BREAKDOWN
+  // ══════════════════════════════════════════════════════
+  // Uses total distance from fuel odometer readings as the denominator.
+  // Each cost category contributes its own $/km figure.
+  // Currently selected range key ('all', 'year', '6m', '3m', 'custom')
+  var cpkmRange = 'all';
+
+  // Cost rate — persisted in settings, default per1
+  function getCostRate() { return loadSettings().costRate || 'per1'; }
+  var costRate = getCostRate();
+
+  function setCostRate(rate) {
+    costRate = rate;
+    // Persist to settings
+    var s = loadSettings(); s.costRate = rate; saveSettings_(s);
+    // Sync radio buttons in settings modal
+    document.querySelectorAll('input[name="costrate"]').forEach(function(r){
+      r.checked = r.value === rate;
+    });
+    // Re-render everything that shows economy figures
+    renderDash();
+    renderHistory();
+  }
+
+  // Switch the active pill and show/hide custom date inputs
+  function setCpkmRange(range) {
+    cpkmRange = range;
+    document.querySelectorAll('.range-pill').forEach(function(btn) {
+      var isActive = btn.getAttribute('data-range') === range;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    var customRow = document.getElementById('cpkm-custom-dates');
+    if (range === 'custom') {
+      customRow.classList.add('visible');
+    } else {
+      customRow.classList.remove('visible');
+    }
+    renderCostPerKm();
+  }
+
+  // Return { from: Date, to: Date } for the current range selection.
+  // 'from' is the start of the range (inclusive); 'to' is today (inclusive).
+  function getCpkmDateRange() {
+    var to   = new Date(); to.setHours(23,59,59,999);
+    var from = new Date(0); // epoch = "all time"
+
+    if (cpkmRange === 'year') {
+      from = new Date(to.getFullYear(), 0, 1); // Jan 1 this year
+    } else if (cpkmRange === '6m') {
+      from = new Date(to); from.setMonth(from.getMonth() - 6);
+    } else if (cpkmRange === '3m') {
+      from = new Date(to); from.setMonth(from.getMonth() - 3);
+    } else if (cpkmRange === 'custom') {
+      var f = document.getElementById('cpkm-from').value;
+      var t = document.getElementById('cpkm-to').value;
+      if (f) { from = new Date(f+'T00:00:00'); }
+      if (t) { to   = new Date(t+'T23:59:59'); }
+    }
+    return { from: from, to: to };
+  }
+
+  function renderCostPerKm() {
+    var range    = getCpkmDateRange();
+    var allFuel  = loadEntries();
+    var allOil   = loadOilChanges();
+    var allMaint = loadMaint();
+
+    // Filter each dataset to the selected date range
+    function inRange(dateStr) {
+      var d = new Date(dateStr+'T00:00:00');
+      return d >= range.from && d <= range.to;
+    }
+
+    var fuelRaw  = allFuel.filter(function(e){ return inRange(e.date) && !e.estimated; });
+    var oilRaw   = allOil.filter(function(r){ return inRange(r.date); });
+    var maintRaw = allMaint.filter(function(r){ return inRange(r.date); });
+
+    var el = document.getElementById('cpkm-rows');
+
+    // Distance: difference between highest and lowest odometer IN the filtered fuel entries.
+    // This gives a fair distance figure for the chosen period.
+    var byOdo = fuelRaw.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    var totalDist = byOdo.length > 1
+      ? Number(byOdo[byOdo.length-1].odo) - Number(byOdo[0].odo)
+      : 0;
+
+    if (totalDist < 1) {
+      el.innerHTML = '<div class="empty" style="padding:1rem 0">No fuel data in this date range.</div>';
+      return;
+    }
+
+    var fuelTotal  = fuelRaw.reduce(function(s,e){ return s+Number(e.total); }, 0);
+    var oilTotal   = oilRaw.reduce(function(s,r){ return s+(r.cost!=null?Number(r.cost):0); }, 0);
+    var maintTotal = maintRaw.reduce(function(s,r){ return s+(r.cost!=null?Number(r.cost):0); }, 0);
+    var grandTotal = fuelTotal + oilTotal + maintTotal;
+
+    var categories = [
+      { label:'Fuel',        total:fuelTotal,  color:'var(--teal)',   emoji:'⛽' },
+      { label:'Oil changes', total:oilTotal,   color:'var(--amber)',  emoji:'🛢' },
+      { label:'Maintenance', total:maintTotal, color:'var(--violet)', emoji:'🔧' },
+    ];
+
+    // Convert stored km distance to display unit
+    var totalDistDisp = toDisplayDist(totalDist);
+    var distUnit = U().dist;
+
+    // Rate mode: per 1 unit or per 100 units — read from persisted setting
+    var multiplier  = costRate === 'per100' ? 100 : 1;
+    var rateLabel   = costRate === 'per100' ? ('/ 100 '+distUnit) : ('/ '+distUnit);
+    var rateShort   = costRate === 'per100' ? (currSym()+'/100 '+distUnit) : (currSym()+'/'+distUnit);
+
+    var rows = categories.map(function(cat) {
+      var cpDist = (cat.total / totalDistDisp) * multiplier;
+      return '<div class="cost-row">'+
+        '<span class="ck"><span class="cost-dot" style="background:'+cat.color+'"></span>'+cat.emoji+' '+cat.label+'</span>'+
+        '<span class="cv">'+fmtC(cat.total)+'&nbsp;<span style="color:var(--hint);font-weight:400;font-size:12px">'+fmt(cpDist,2)+' '+rateShort+'</span></span>'+
+      '</div>';
+    }).join('');
+
+    // Range label shown under the total
+    var rangeLabels = { all:'All time', year:'This year', '6m':'Last 6 months', '3m':'Last 3 months', custom:'Custom range' };
+    var rangeNote   = rangeLabels[cpkmRange] || '';
+
+    var grandCpDist = (grandTotal / totalDistDisp) * multiplier;
+    var totalRow =
+      '<div class="cost-total-row">'+
+        '<span>Total cost '+rateLabel+'</span>'+
+        '<span>'+fmt(grandCpDist,2)+' <span style="color:var(--muted);font-size:13px">'+rateShort+'</span></span>'+
+      '</div>';
+
+    var distNote =
+      '<div style="font-size:11px;color:var(--hint);margin-top:8px">'+
+        rangeNote+' · '+Math.round(totalDistDisp).toLocaleString()+' '+distUnit+' tracked'+
+      '</div>';
+
+    el.innerHTML = rows + totalRow + distNote;
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // DASHBOARD
+  // ══════════════════════════════════════════════════════
+  function renderDash() {
+    renderOilStatus();
+    renderCostPerKm();
+    var raw      = loadEntries();        // load once
+    var oilRecs  = loadOilChanges();     // load once
+    var maintRecs= loadMaint();          // load once
+
+    if (!raw.length) {
+      ['m-kml','m-cphk','m-spent','m-ppl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML='--'; });
+      document.getElementById('chart-kml').innerHTML='<div style="color:var(--hint);font-size:13px;padding:1rem 0">Add fillups to see charts.</div>';
+      document.getElementById('chart-ppl').innerHTML='';
+      document.getElementById('stat-rows').innerHTML='<div class="empty">No fuel data yet.</div>';
+      document.getElementById('oil-chart-card').style.display='none';
+      return;
+    }
+
+    var entries  = addEconomyData(raw);
+    // Fix 7: exclude estimated entries from best/worst tank calculations
+    var withEco  = entries.filter(function(e){ return e.kml!==null && !e.estimated; });
+    // Exclude estimated entries from spend/litre totals so fabricated costs don't inflate averages
+    var realRaw     = raw.filter(function(e){ return !e.estimated; });
+    var totalSpent  = realRaw.reduce(function(s,e){ return s+Number(e.total); }, 0);
+    var totalLitres = realRaw.reduce(function(s,e){ return s+Number(e.litres); }, 0);
+    var avgPPL      = totalSpent/totalLitres;
+    var avgKml      = realAvgKml(raw);  // excludes estimated entries
+    var costPer100  = !isNaN(avgKml) ? (100/avgKml)*avgPPL : NaN;
+
+    document.getElementById('m-kml').innerHTML   = !isNaN(avgKml) ? fmtEff(avgKml,2) : '--';
+    document.getElementById('m-cphk').innerHTML  = !isNaN(costPer100) ? fmtC(costPer100 * U().distFactor) : '--';
+    document.getElementById('m-spent').innerHTML = currSym()+totalSpent.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    document.getElementById('m-ppl').innerHTML   = fmtC(avgPPL / U().volFactor);
+
+    // Update lbl-m-kml to reflect current mode
+    setText('lbl-m-kml', useL100() ? 'Avg economy' : 'Avg economy');
+
+    // Economy chart — km/L or L/100km depending on mode
+    var kmlCount = parseInt(document.getElementById('kml-count').value,10);
+    var kmlData  = kmlCount>0 ? withEco.slice(-kmlCount) : withEco.slice();
+    document.getElementById('kml-chart-title').textContent = effLabel()+' — '+(kmlCount>0?'Last '+kmlCount:'All');
+    var kmlEl = document.getElementById('chart-kml');
+    kmlEl.style.setProperty('--bar-count', kmlData.length);
+    kmlEl.innerHTML = buildChart(kmlData.map(function(e){
+      var v = dispEff(e.kml);
+      return {
+        value:      v,
+        displayVal: fmt(v,1),
+        label:      fmtDateShort(e.date),
+        color:      'var(--teal)',
+        estimated:  !!e.estimated
+      };
+    }), 15, 'var(--teal)', useL100());
+    // Show legend only when at least one estimated bar is in this chart
+    var kmlLeg=document.getElementById('kml-legend'); if(kmlLeg) kmlLeg.style.display=kmlData.some(function(e){return e.estimated;})?'block':'none';
+
+    // Price/L chart
+    var pplCount  = parseInt(document.getElementById('ppl-count').value,10);
+    var pplSorted = raw.slice().sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+    var pplData   = pplCount>0 ? pplSorted.slice(-pplCount) : pplSorted.slice();
+    document.getElementById('ppl-chart-title').textContent = 'Price / '+U().volShort+' — '+(pplCount>0?'Last '+pplCount:'All');
+    var pplEl = document.getElementById('chart-ppl');
+    pplEl.style.setProperty('--bar-count', pplData.length);
+    pplEl.innerHTML = buildChart(pplData.map(function(e){
+      var dispPpl = Number(e.ppl) / U().volFactor;
+      return {
+        value:      dispPpl,
+        displayVal: '$'+dispPpl.toFixed(2),
+        label:      fmtDateShort(e.date),
+        color:      'var(--amber)',
+        estimated:  !!e.estimated
+      };
+    }), 20, 'var(--amber)');
+    // Show legend only when at least one estimated bar is in this chart
+    var pplLeg=document.getElementById('ppl-legend'); if(pplLeg) pplLeg.style.display=pplData.some(function(e){return e.estimated;})?'block':'none';
+
+    // Oil interval chart
+    var oilRecords = oilRecs.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    var oilCard    = document.getElementById('oil-chart-card');
+    if (oilRecords.length<2) {
+      oilCard.style.display='none';
+    } else {
+      oilCard.style.display='';
+      var intervals=[];
+      for (var i=1;i<oilRecords.length;i++) {
+        var iv = Number(oilRecords[i].odo)-Number(oilRecords[i-1].odo);
+        var ivDisp = Math.round(toDisplayDist(iv));
+        intervals.push({value:ivDisp, displayVal:ivDisp.toLocaleString(), label:fmtDateShort(oilRecords[i].date), color:'var(--violet)'});
+      }
+      var oilCount = parseInt(document.getElementById('oil-chart-count').value,10);
+      var oilData  = oilCount>0 ? intervals.slice(-oilCount) : intervals.slice();
+      document.getElementById('oil-chart-title').textContent=U().dist+' between oil changes — '+(oilCount>0?'Last '+oilCount:'All');
+      var oilEl = document.getElementById('chart-oil');
+      oilEl.style.setProperty('--bar-count', oilData.length);
+      oilEl.innerHTML = buildChart(oilData, 20, 'var(--violet)');
+    }
+
+    // All-time stats
+    var byOdo    = raw.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    var totalDist= byOdo.length>1 ? Number(byOdo[byOdo.length-1].odo)-Number(byOdo[0].odo) : 0;
+    var bestKml  = withEco.length ? Math.max.apply(null,withEco.map(function(e){return e.kml;})) : NaN;
+    var worstKml = withEco.length ? Math.min.apply(null,withEco.map(function(e){return e.kml;})) : NaN;
+    var oilSpent  = oilRecs.reduce(function(s,r){ return s+(r.cost!=null?Number(r.cost):0); },0);
+    var maintSpent= maintRecs.reduce(function(s,r){ return s+(r.cost!=null?Number(r.cost):0); },0);
+
+    var stats = [
+      ['Fillups recorded',       raw.length],
+      ['Total '+U().dist+' tracked', totalDist>0 ? Math.round(toDisplayDist(totalDist)).toLocaleString()+' '+U().dist : '--'],
+      ['Best tank',              !isNaN(bestKml)  ? fmtEff(bestKml,2) : '--'],
+      ['Worst tank',             !isNaN(worstKml) ? fmtEff(worstKml,2) : '--'],
+      ['Avg fillup size',        fmt(toDisplayVol(totalLitres/raw.length),1)+' '+U().volShort],
+      ['Total volume purchased', fmt(toDisplayVol(totalLitres),1)+' '+U().vol],
+      ['Total fuel cost',        '$'+totalSpent.toFixed(2)],
+      ['Total oil change cost',  '$'+oilSpent.toFixed(2)],
+      ['Total maintenance cost', '$'+maintSpent.toFixed(2)],
+      ['Oil changes logged',     oilRecs.length],
+      ['Maintenance items logged',maintRecs.length],
+    ];
+    document.getElementById('stat-rows').innerHTML = stats.map(function(r){
+      return '<div class="stat-row"><span class="sk">'+r[0]+'</span><span class="sv">'+r[1]+'</span></div>';
+    }).join('');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // FUEL HISTORY TABLE
+  // ══════════════════════════════════════════════════════
+  function renderHistory() {
+    var raw  = loadEntries();            // load once
+    var body = document.getElementById('log-body');
+    var empty= document.getElementById('log-empty');
+    if (!raw.length) { body.innerHTML=''; empty.style.display=''; return; }
+    empty.style.display='none';
+
+    var entries = addEconomyData(raw).reverse();
+    var avgKml  = realAvgKml(raw) || null; // reuse raw, don't re-load
+    var avgs    = getRealAverages(raw);
+    var avgDist = avgs.avgDist;
+
+    body.innerHTML = entries.map(function(e) {
+      var isEst = !!e.estimated;
+
+      // Economy badge — direction-aware for L/100km (lower = better)
+      var badge = '';
+      if (isEst) {
+        badge = '<span class="badge badge-est">~est</span>';
+      } else if (e.kml!==null && avgKml!==null) {
+        var isBetter = effBetter(e.kml, avgKml * 1.05);
+        var isWorse  = effBetter(avgKml * 0.95, e.kml);
+        var cls = isBetter ? 'badge-good' : isWorse ? 'badge-bad' : 'badge-avg';
+        badge = '<span class="badge '+cls+'">'+fmtEff(e.kml,2)+'</span>';
+      }
+
+      // Distance with optional gap warning
+      var distStr = e.dist===null ? '' : Math.round(toDisplayDist(e.dist))+' '+U().dist;
+      var isSuspicious = !isEst && avgDist>0 && e.dist!==null && e.dist > avgDist*GAP_THRESHOLD;
+      var distPart = isSuspicious
+        ? '<button class="gap-warn-btn" data-action="inline-gap" data-id="'+e.id+'">⚠️ '+distStr+'</button>'
+        : distStr;
+
+      // Sub-line: odo · dist · vol · price/unit
+      var sub = [
+        Math.round(toDisplayDist(Number(e.odo))).toLocaleString()+' '+U().dist,
+        distPart ? '+'+distPart : '',
+        fmt(toDisplayVol(e.litres),1)+' '+U().volShort,
+        fmtC(Number(e.ppl)/U().volFactor)+'/'+U().volShort
+      ].filter(Boolean).join(' · ');
+
+      // Action buttons
+      var actions;
+      if (isEst) {
+        actions =
+          '<button class="btn-sm" data-action="edit" data-id="'+e.id+'">Edit</button>'+
+          (e.gapGroupId ? '<button class="btn-sm" style="background:var(--amber-light);border-color:var(--amber);color:var(--amber-dark)" data-action="recount-gap" data-groupid="'+e.gapGroupId+'">Recount</button>' : '')+
+          '<button class="btn-sm" style="color:var(--red-dark);border-color:var(--red-dark)" data-action="del" data-id="'+e.id+'">Del</button>';
+      } else {
+        actions =
+          '<button class="btn-sm" data-action="edit" data-id="'+e.id+'">Edit</button>'+
+          '<button class="btn-sm" style="color:var(--red-dark);border-color:var(--red-dark)" data-action="del" data-id="'+e.id+'">Del</button>';
+      }
+
+      return '<div class="hist-row'+(isEst?' estimated':'')+'">'+
+        '<div>'+
+          '<div class="hist-main">'+fmtDate(e.date)+' <span style="font-weight:400;color:var(--muted)">'+fmtC(e.total)+'</span></div>'+
+          '<div class="hist-sub">'+sub+(e.note?' · <span style="color:var(--hint)">'+esc(e.note)+'</span>':'')+'</div>'+
+          '<div class="hist-badge">'+badge+'</div>'+
+        '</div>'+
+        '<div class="hist-actions">'+actions+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // OIL HISTORY TABLE
+  // ══════════════════════════════════════════════════════
+  function renderOilHistory() {
+    var records = loadOilChanges();
+    var body    = document.getElementById('oil-body');
+    var empty   = document.getElementById('oil-empty');
+    if (!records.length) { body.innerHTML=''; empty.style.display=''; return; }
+    empty.style.display='none';
+
+    var sorted = records.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    body.innerHTML = sorted.map(function(r) {
+      var details = [
+        Math.round(toDisplayDist(Number(r.odo))).toLocaleString()+' '+U().dist,
+        r.cost!=null ? fmtC(r.cost) : null,
+        r.oil || null,
+        r.filter || null
+      ].filter(Boolean).join(' · ');
+
+      var next = [];
+      if (r.nextKm)   next.push('Next: '+Math.round(toDisplayDist(Number(r.nextKm))).toLocaleString()+' '+U().dist);
+      if (r.nextDate) next.push(fmtDate(r.nextDate));
+
+      return '<div class="hist-row">'+
+        '<div>'+
+          '<div class="hist-main">'+fmtDate(r.date)+'</div>'+
+          '<div class="hist-sub">'+details+'</div>'+
+          (next.length ? '<div class="hist-sub" style="color:var(--teal)">'+next.join(' · ')+'</div>' : '')+
+          (r.note ? '<div class="hist-sub" style="color:var(--hint)">'+esc(r.note)+'</div>' : '')+
+        '</div>'+
+        '<div class="hist-actions">'+
+          '<button class="btn-sm" data-action="oil-edit" data-id="'+r.id+'">Edit</button>'+
+          '<button class="btn-sm" style="color:var(--red-dark);border-color:var(--red-dark)" data-action="oil-del" data-id="'+r.id+'">Del</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // MAINTENANCE HISTORY TABLE
+  // ══════════════════════════════════════════════════════
+  function renderMaintHistory() {
+    var records = loadMaint();
+    var body    = document.getElementById('maint-body');
+    var empty   = document.getElementById('maint-empty');
+    if (!records.length) { body.innerHTML=''; empty.style.display=''; return; }
+    empty.style.display='none';
+
+    var sorted = records.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    body.innerHTML = sorted.map(function(r) {
+      var details = [
+        Math.round(toDisplayDist(Number(r.odo))).toLocaleString()+' '+U().dist,
+        r.cost!=null ? fmtC(r.cost) : null
+      ].filter(Boolean).join(' · ');
+
+      return '<div class="hist-row">'+
+        '<div>'+
+          '<div class="hist-main">'+fmtDate(r.date)+' <span class="badge badge-maint">'+r.type+'</span></div>'+
+          '<div class="hist-sub">'+details+'</div>'+
+          (r.note ? '<div class="hist-sub" style="color:var(--hint)">'+esc(r.note)+'</div>' : '')+
+        '</div>'+
+        '<div class="hist-actions">'+
+          '<button class="btn-sm" data-action="maint-edit" data-id="'+r.id+'">Edit</button>'+
+          '<button class="btn-sm" style="color:var(--red-dark);border-color:var(--red-dark)" data-action="maint-del" data-id="'+r.id+'">Del</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // DELEGATED CLICK HANDLER
+  // ══════════════════════════════════════════════════════
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    var id     = btn.getAttribute('data-id');
+    if (action==='edit')        openEditModal(id);
+    if (action==='del')         confirmDelete(id,'single','Delete this fillup?');
+    if (action==='oil-edit')    openOilEditModal(id);
+    if (action==='oil-del')     confirmDelete(id,'oil-single','Delete this oil change?');
+    if (action==='maint-edit')  openMaintEditModal(id);
+    if (action==='maint-del')   confirmDelete(id,'maint-single','Delete this item?');
+    if (action==='recount-gap') openRecountGap(btn.getAttribute('data-groupid'));
+    if (action==='inline-gap')  openInlineGap(id);
+  });
+
+
+  // ══════════════════════════════════════════════════════
+  // FUEL EDIT MODAL
+  // ══════════════════════════════════════════════════════
+  var currentEditId = null;
+
+  function openEditModal(id) {
+    var e = loadEntries().find(function(x){ return String(x.id)===String(id); });
+    if (!e) return;
+    currentEditId = String(id);
+    document.getElementById('e-date').value   = e.date;
+    document.getElementById('e-odo').value    = e.odo;
+    document.getElementById('e-litres').value = e.litres;
+    document.getElementById('e-total').value  = e.total;
+    document.getElementById('e-ppl').value    = Number(e.ppl).toFixed(3);
+    document.getElementById('e-note').value   = e.note||'';
+    document.getElementById('edit-modal').classList.add('open');
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.remove('open');
+    currentEditId=null;
+  }
+
+  function saveEdit() {
+    var entries = loadEntries();
+    var idx = entries.findIndex(function(x){ return String(x.id)===String(currentEditId); });
+    if (idx===-1) { closeEditModal(); return; }
+    var date=document.getElementById('e-date').value;
+    var odo=parseFloat(document.getElementById('e-odo').value);
+    var litres=parseFloat(document.getElementById('e-litres').value);
+    var total=parseFloat(document.getElementById('e-total').value);
+    var ppl=parseFloat(document.getElementById('e-ppl').value);
+    var note=document.getElementById('e-note').value.trim();
+    if (!date||isNaN(odo)||isNaN(litres)||isNaN(total)) { toast('Please fill in all required fields.'); return; }
+    if (isNaN(ppl)||ppl<=0) ppl=total/litres;
+    // If the user edits an estimated entry they're entering real data,
+    // so clear all estimated flags so it's treated as a real entry.
+    entries[idx]=Object.assign({},entries[idx],{
+      date:date, odo:odo, litres:litres, total:total, ppl:ppl, note:note,
+      estimated:false, gapGroupId:null, gapPrevOdo:null, gapNextOdo:null
+    });
+    saveEntries(entries); closeEditModal(); renderHistory(); renderDash();
+    toast('Fillup updated!');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // OIL EDIT MODAL
+  // ══════════════════════════════════════════════════════
+  var currentOilEditId = null;
+
+  function openOilEditModal(id) {
+    var r = loadOilChanges().find(function(x){ return String(x.id)===String(id); });
+    if (!r) return;
+    currentOilEditId=String(id);
+    document.getElementById('oe-date').value      = r.date;
+    document.getElementById('oe-odo').value       = r.odo;
+    document.getElementById('oe-cost').value      = r.cost!=null?r.cost:'';
+    document.getElementById('oe-oil').value       = r.oil||'';
+    document.getElementById('oe-filter').value    = r.filter||'';
+    document.getElementById('oe-next-km').value   = r.nextKm!=null?r.nextKm:'';
+    document.getElementById('oe-next-date').value = r.nextDate||'';
+    document.getElementById('oe-note').value      = r.note||'';
+    document.getElementById('oil-edit-modal').classList.add('open');
+  }
+
+  function closeOilEditModal() {
+    document.getElementById('oil-edit-modal').classList.remove('open');
+    currentOilEditId=null;
+  }
+
+  function saveOilEdit() {
+    var records = loadOilChanges();
+    var idx = records.findIndex(function(x){ return String(x.id)===String(currentOilEditId); });
+    if (idx===-1) { closeOilEditModal(); return; }
+    var date=document.getElementById('oe-date').value;
+    var odo=parseFloat(document.getElementById('oe-odo').value);
+    var cost=document.getElementById('oe-cost').value.trim();
+    var oil=document.getElementById('oe-oil').value.trim();
+    var filter=document.getElementById('oe-filter').value.trim();
+    var nextKm=document.getElementById('oe-next-km').value.trim();
+    var nextDate=document.getElementById('oe-next-date').value;
+    var note=document.getElementById('oe-note').value.trim();
+    if (!date||isNaN(odo)) { toast('Please fill in date and odometer.'); return; }
+    records[idx]=Object.assign({},records[idx],{
+      date:date, odo:odo,
+      cost:cost?parseFloat(cost):null,
+      oil:oil, filter:filter,
+      nextKm:nextKm?parseFloat(nextKm):null,
+      nextDate:nextDate||null, note:note
+    });
+    saveOilChanges(records); closeOilEditModal(); renderOilHistory(); renderDash();
+    toast('Oil change updated!');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // MAINTENANCE EDIT MODAL
+  // ══════════════════════════════════════════════════════
+  var currentMaintEditId = null;
+
+  function openMaintEditModal(id) {
+    var r = loadMaint().find(function(x){ return String(x.id)===String(id); });
+    if (!r) return;
+    currentMaintEditId=String(id);
+    document.getElementById('me-date').value = r.date;
+    document.getElementById('me-type').value = r.type||'';
+    document.getElementById('me-odo').value  = r.odo;
+    document.getElementById('me-cost').value = r.cost!=null?r.cost:'';
+    document.getElementById('me-note').value = r.note||'';
+    document.getElementById('maint-edit-modal').classList.add('open');
+  }
+
+  function closeMaintEditModal() {
+    document.getElementById('maint-edit-modal').classList.remove('open');
+    currentMaintEditId=null;
+  }
+
+  function saveMaintEdit() {
+    var records = loadMaint();
+    var idx = records.findIndex(function(x){ return String(x.id)===String(currentMaintEditId); });
+    if (idx===-1) { closeMaintEditModal(); return; }
+    var date=document.getElementById('me-date').value;
+    var type=document.getElementById('me-type').value;
+    var odo=parseFloat(document.getElementById('me-odo').value);
+    var cost=document.getElementById('me-cost').value.trim();
+    var note=document.getElementById('me-note').value.trim();
+    if (!date||isNaN(odo)) { toast('Please fill in date and odometer.'); return; }
+    records[idx]=Object.assign({},records[idx],{
+      date:date, type:type, odo:odo,
+      cost:cost?parseFloat(cost):null, note:note
+    });
+    saveMaint_(records); closeMaintEditModal(); renderMaintHistory(); renderDash();
+    toast('Maintenance updated!');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // CONFIRM MODAL (unified)
+  // ══════════════════════════════════════════════════════
+  var confirmMode=null, pendingDeleteId=null;
+
+  function confirmDelete(id, mode, title) {
+    confirmMode=mode; pendingDeleteId=String(id);
+    document.getElementById('confirm-title').textContent=title;
+    document.getElementById('confirm-body').textContent='This cannot be undone.';
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+
+  function deleteAll() {
+    var n=loadEntries().length; if(!n){toast('Nothing to delete.');return;}
+    confirmMode='all'; pendingDeleteId=null;
+    document.getElementById('confirm-title').textContent='Delete all fillups?';
+    document.getElementById('confirm-body').textContent='This will permanently erase all '+n+' fillups.';
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+
+  function deleteAllOil() {
+    var n=loadOilChanges().length; if(!n){toast('Nothing to delete.');return;}
+    confirmMode='all-oil'; pendingDeleteId=null;
+    document.getElementById('confirm-title').textContent='Delete all oil changes?';
+    document.getElementById('confirm-body').textContent='This will permanently erase all '+n+' oil change records.';
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+
+  function deleteAllMaint() {
+    var n=loadMaint().length; if(!n){toast('Nothing to delete.');return;}
+    confirmMode='all-maint'; pendingDeleteId=null;
+    document.getElementById('confirm-title').textContent='Delete all maintenance?';
+    document.getElementById('confirm-body').textContent='This will permanently erase all '+n+' maintenance records.';
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.remove('open');
+    confirmMode=null; pendingDeleteId=null;
+  }
+
+  document.getElementById('confirm-yes').addEventListener('click', function() {
+    if (confirmMode==='single' && pendingDeleteId) {
+      saveEntries(loadEntries().filter(function(e){return String(e.id)!==pendingDeleteId;}));
+      closeConfirmModal(); renderHistory(); renderDash(); toast('Deleted.');
+
+    } else if (confirmMode==='all') {
+      saveEntries([]); closeConfirmModal(); renderHistory(); renderDash(); toast('All fillups deleted.');
+
+    } else if (confirmMode==='oil-single' && pendingDeleteId) {
+      saveOilChanges(loadOilChanges().filter(function(r){return String(r.id)!==pendingDeleteId;}));
+      closeConfirmModal(); renderOilHistory(); renderDash(); toast('Oil change deleted.');
+
+    } else if (confirmMode==='all-oil') {
+      saveOilChanges([]); closeConfirmModal(); renderOilHistory(); renderDash(); toast('All oil changes deleted.');
+
+    } else if (confirmMode==='maint-single' && pendingDeleteId) {
+      saveMaint_(loadMaint().filter(function(r){return String(r.id)!==pendingDeleteId;}));
+      closeConfirmModal(); renderMaintHistory(); renderDash(); toast('Deleted.');
+
+    } else if (confirmMode==='all-maint') {
+      saveMaint_([]); closeConfirmModal(); renderMaintHistory(); renderDash(); toast('All maintenance deleted.');
+    }
+  });
+
+
+  // ══════════════════════════════════════════════════════
+  // MISSED FILLUP — GAP DETECTION & ESTIMATION
+  // ══════════════════════════════════════════════════════
+
+  // How many times larger than average a gap must be to trigger the prompt.
+  // 1.5 means the distance was 50% bigger than a normal tank range.
+  // Lower = more sensitive. 1.8 was too high and missed real gaps.
+  var GAP_THRESHOLD = 1.5;
+
+  // State for the gap modal
+  var gapState = null; // { prevEntry, newEntry, avgDist, avgLitres, avgPpl }
+  var gapCount = 1;
+
+  // Opens the gap modal for a specific suspicious row in history.
+  // Called when the user taps the ⚠️ button on a dist cell.
+  // id = the entry whose distance looks suspicious (the "later" entry of the pair).
+  function openInlineGap(id) {
+    var entries = loadEntries();
+    var sorted  = entries.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    var idx     = sorted.findIndex(function(e){ return String(e.id)===String(id); });
+    if (idx < 1) { toast('Could not find surrounding entries.'); return; }
+
+    var prev     = sorted[idx-1];
+    var current  = sorted[idx];
+    var dist     = Number(current.odo) - Number(prev.odo);
+    var avgs     = getRealAverages(entries);
+
+    if (!avgs.avgDist) { toast('Not enough history to estimate.'); return; }
+
+    gapState = {
+      prev:      prev,
+      newEntry:  current,
+      dist:      dist,
+      avgDist:   avgs.avgDist,
+      avgLitres: avgs.avgLitres,
+      avgPpl:    avgs.avgPpl
+    };
+    gapCount = Math.max(1, Math.round(dist / avgs.avgDist) - 1);
+
+    updateGapModal();
+    document.querySelector('#gap-modal .modal-title').textContent = '⚠️ Gap in history';
+    document.getElementById('gap-modal').classList.add('open');
+  }
+
+
+  // Called after a new fillup is saved successfully.
+  // Checks if the distance since the previous entry looks like a missed fill.
+  function checkForGap(newEntry) {
+    var entries = loadEntries();
+    var sorted  = entries.slice().sort(function(a,b){ return Number(a.odo)-Number(b.odo); });
+    var idx     = sorted.findIndex(function(e){ return String(e.id)===String(newEntry.id); });
+    if (idx < 1) return; // first entry — no gap possible
+
+    var prev = sorted[idx-1];
+    var dist = Number(newEntry.odo) - Number(prev.odo);
+
+    // Calculate average tank range from real (non-estimated) entries
+    var avgs = getRealAverages(entries);
+    if (!avgs.avgDist) return; // not enough history to judge
+
+    if (dist < avgs.avgDist * GAP_THRESHOLD) return; // gap looks normal
+
+    // Gap detected — show the modal
+    gapState = { prev:prev, newEntry:newEntry, dist:dist, avgDist:avgs.avgDist, avgLitres:avgs.avgLitres, avgPpl:avgs.avgPpl };
+    gapCount = Math.max(1, Math.round(dist/avgs.avgDist) - 1); // best guess at missed count
+
+    updateGapModal();
+    document.getElementById('gap-modal').classList.add('open');
+  }
+
+  function updateGapModal() {
+    var s = gapState;
+    var estCost = gapCount * s.avgLitres * s.avgPpl;
+    document.getElementById('gap-info-text').innerHTML =
+      'You drove <strong>'+Math.round(toDisplayDist(s.dist)).toLocaleString()+' '+U().dist+'</strong> since your last fillup, '+
+      'but your average tank range is <strong>'+Math.round(toDisplayDist(s.avgDist)).toLocaleString()+' '+U().dist+'</strong>. '+
+      'It looks like you may have missed '+gapCount+' fillup'+(gapCount===1?'':'s')+'.';
+    document.getElementById('gap-num').textContent = gapCount;
+    document.getElementById('gap-estimate-text').textContent =
+      'Estimated cost: $'+estCost.toFixed(2)+' ('+gapCount+'×  avg $'+(s.avgLitres*s.avgPpl).toFixed(2)+'/fill)';
+  }
+
+  function adjustGap(delta) {
+    gapCount = Math.max(1, gapCount + delta);
+    updateGapModal();
+  }
+
+  function dismissGap() {
+    document.getElementById('gap-modal').classList.remove('open');
+    document.querySelector('#gap-modal .modal-title').textContent = '⚠️ Large gap detected';
+    gapState = null;
+  }
+
+  // Recount: called when user taps the Recount button on an estimated row.
+  // Finds the gap bounds from the stored metadata, deletes the old estimated
+  // group, then re-opens the gap modal so they can pick a different number.
+  function openRecountGap(groupId) {
+    var entries = loadEntries();
+
+    // Find any member of this group to read the gap bounds
+    var groupMember = entries.find(function(e){ return e.gapGroupId===groupId; });
+    if (!groupMember) { toast('Gap group not found.'); return; }
+
+    var prevOdo  = Number(groupMember.gapPrevOdo);
+    var nextOdo  = Number(groupMember.gapNextOdo);
+
+    // Find the real entries that bracket this gap
+    var prevEntry = entries.find(function(e){ return Number(e.odo)===prevOdo && !e.estimated; });
+    var nextEntry = entries.find(function(e){ return Number(e.odo)===nextOdo && !e.estimated; });
+
+    if (!prevEntry || !nextEntry) {
+      toast('Could not find original gap boundaries. Delete and re-enter manually.');
+      return;
+    }
+
+    // Delete all entries in this gap group
+    var remaining = entries.filter(function(e){ return e.gapGroupId!==groupId; });
+    saveEntries(remaining);
+    renderHistory();
+
+    // Recalculate averages from remaining real entries (after deletion)
+    var avgs = getRealAverages(remaining);
+    var dist = nextOdo - prevOdo;
+
+    // Re-open the gap modal with the same context
+    gapState = {
+      prev:      prevEntry,
+      newEntry:  nextEntry,
+      dist:      dist,
+      avgDist:   avgs.avgDist || 300,
+      avgLitres: avgs.avgLitres || 45,
+      avgPpl:    avgs.avgPpl || 1.5
+    };
+    gapCount = Math.max(1, Math.round(dist / avgs.avgDist) - 1);
+
+    updateGapModal();
+    // Change modal title to make it clear this is a recount
+    document.querySelector('#gap-modal .modal-title').textContent = '✏️ Recount missed fillups';
+    document.getElementById('gap-modal').classList.add('open');
+  }
+
+  // Insert estimated (synthetic) entries evenly spaced across the gap
+  function confirmGap() {
+    if (!gapState) return;
+    var s       = gapState;
+    var entries = loadEntries();
+    var prevOdo = Number(s.prev.odo);
+    var newOdo  = Number(s.newEntry.odo);
+    var step    = (newOdo - prevOdo) / (gapCount + 1);
+
+    // Space estimated dates evenly between prev and new entry
+    var prevDate = new Date(s.prev.date+'T00:00:00');
+    var newDate  = new Date(s.newEntry.date+'T00:00:00');
+    var daySpan  = (newDate - prevDate) / 86400000;
+    var dayStep  = daySpan / (gapCount + 1);
+
+    var gapGroupId = makeId(); // shared ID across all entries in this gap
+    for (var i = 1; i <= gapCount; i++) {
+      var estOdo  = Math.round(prevOdo + step * i);
+      var estDate = new Date(prevDate.getTime() + dayStep * i * 86400000);
+      var dateStr = estDate.toISOString().split('T')[0];
+      entries.push({
+        id:          makeId(),
+        date:        dateStr,
+        odo:         estOdo,
+        litres:      parseFloat(s.avgLitres.toFixed(2)),
+        total:       parseFloat((s.avgLitres * s.avgPpl).toFixed(2)),
+        ppl:         parseFloat(s.avgPpl.toFixed(3)),
+        note:        'Estimated — missed fillup',
+        estimated:   true,       // flag so we can display differently
+        gapGroupId:  gapGroupId, // links all entries from the same gap together
+        gapPrevOdo:  prevOdo,    // remember gap bounds so Recount can re-open correctly
+        gapNextOdo:  newOdo
+      });
+    }
+
+    saveEntries(entries);
+    document.getElementById('gap-modal').classList.remove('open');
+    gapState = null;
+    renderHistory();
+    renderDash();
+    toast(gapCount+' estimated entr'+(gapCount===1?'y':'ies')+' inserted.');
+  }
+
+  // ══════════════════════════════════════════════════════
+  // SAVE FUEL FILLUP
+  // ══════════════════════════════════════════════════════
+  function saveFillup() {
+    var date=document.getElementById('f-date').value;
+    var odo=parseFloat(document.getElementById('f-odo').value);
+    var litres=parseFloat(document.getElementById('f-litres').value);
+    var total=parseFloat(document.getElementById('f-total').value);
+    var note=document.getElementById('f-note').value.trim();
+    if (!date||isNaN(odo)||isNaN(litres)||isNaN(total)) { toast('Please fill in date, odometer, litres, and total cost.'); return; }
+    var entries=loadEntries();
+    if (entries.find(function(e){return Math.abs(Number(e.odo)-odo)<0.5;})) { toast('That odometer reading already exists!'); return; }
+    var newEntry={id:makeId(),date:date,odo:odo,litres:litres,total:total,ppl:total/litres,note:note};
+    entries.push(newEntry);
+    saveEntries(entries);
+    ['f-odo','f-litres','f-total','f-ppl','f-note'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
+    renderHistory();
+    toast('Fillup saved! ⛽');
+    // Check after render so the history is visible before the modal appears
+    setTimeout(function(){ checkForGap(newEntry); }, 300);
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // SAVE OIL CHANGE
+  // ══════════════════════════════════════════════════════
+  function saveOilChange() {
+    var date=document.getElementById('o-date').value;
+    var odo=parseFloat(document.getElementById('o-odo').value);
+    var cost=document.getElementById('o-cost').value.trim();
+    var oil=document.getElementById('o-oil').value.trim();
+    var filter=document.getElementById('o-filter').value.trim();
+    var nextKm=document.getElementById('o-next-km').value.trim();
+    var nextDate=document.getElementById('o-next-date').value;
+    var note=document.getElementById('o-note').value.trim();
+    if (!date||isNaN(odo)) { toast('Please fill in date and odometer.'); return; }
+    var records=loadOilChanges();
+    records.push({id:makeId(),date:date,odo:odo,cost:cost?parseFloat(cost):null,oil:oil,filter:filter,nextKm:nextKm?parseFloat(nextKm):null,nextDate:nextDate||null,note:note});
+    saveOilChanges(records);
+    ['o-odo','o-cost','o-oil','o-filter','o-next-km','o-note'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('o-date').value=new Date().toISOString().split('T')[0];
+    document.getElementById('o-next-date').value='';
+    renderOilHistory(); renderDash();
+    toast('Oil change saved! 🛢');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // SAVE MAINTENANCE
+  // ══════════════════════════════════════════════════════
+  function saveMaint() {
+    var date=document.getElementById('mt-date').value;
+    var type=document.getElementById('mt-type').value;
+    var odo=parseFloat(document.getElementById('mt-odo').value);
+    var cost=document.getElementById('mt-cost').value.trim();
+    var note=document.getElementById('mt-note').value.trim();
+    if (!date||isNaN(odo)) { toast('Please fill in date and odometer.'); return; }
+    var records=loadMaint();
+    records.push({id:makeId(),date:date,type:type||'Other',odo:odo,cost:cost?parseFloat(cost):null,note:note});
+    saveMaint_(records);
+    ['mt-odo','mt-cost','mt-note'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('mt-date').value=new Date().toISOString().split('T')[0];
+    document.getElementById('mt-type').value='';
+    renderMaintHistory(); renderDash();
+    toast('Maintenance saved! 🔧');
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // FULL BACKUP — EXPORT / IMPORT / REMINDER
+  // ══════════════════════════════════════════════════════
+  var LAST_BACKUP_KEY = 'fuellog_last_backup';
+  var BACKUP_REMINDER_DAYS = 14; // show dot after this many days without a backup
+
+  function getLastBackupDate() {
+    var ts = localStorage.getItem(LAST_BACKUP_KEY);
+    return ts ? new Date(Number(ts)) : null;
+  }
+
+  function setLastBackupDate() {
+    localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
+  }
+
+  // Check if backup is overdue and update the settings button dot + status text
+  function checkBackupReminder() {
+    var last     = getLastBackupDate();
+    var btn      = document.getElementById('settings-btn');
+    var statusEl = document.getElementById('backup-status');
+    if (!btn) return;
+
+    if (!last) {
+      btn.classList.add('backup-due');
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--hint)">No backup yet.</span>';
+      return;
+    }
+
+    var daysAgo = Math.floor((Date.now() - last.getTime()) / 86400000);
+    var dateStr = last.toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric' });
+
+    if (daysAgo >= BACKUP_REMINDER_DAYS) {
+      btn.classList.add('backup-due');
+      if (statusEl) statusEl.innerHTML =
+        '<span style="color:var(--amber-dark)">⚠️ Last backup: '+dateStr+' ('+daysAgo+' days ago)</span>';
+    } else {
+      btn.classList.remove('backup-due');
+      if (statusEl) statusEl.innerHTML =
+        '<span style="color:var(--teal)">✓ Last backup: '+dateStr+
+        (daysAgo===0 ? ' (today)' : ' ('+daysAgo+' day'+(daysAgo===1?'':'s')+' ago)')+'</span>';
+    }
+  }
+
+  // Export all data as a single JSON file
+  function exportFullBackup() {
+    var cars = loadCars();
+    var backup = {
+      version:   2,
+      exportedAt: new Date().toISOString(),
+      appName:   'FuelLog',
+      settings:  loadSettings(),
+      cars:      cars,
+      data:      {}
+    };
+
+    // Include data for every car
+    cars.forEach(function(car) {
+      backup.data[car.id] = {
+        fuel:  loadEntries(car.id),
+        oil:   loadOilChanges(car.id),
+        maint: loadMaint(car.id)
+      };
+    });
+
+    // Also include legacy (non-car) data if it exists
+    var legacyFuel  = localStorage.getItem(FUEL_KEY);
+    var legacyOil   = localStorage.getItem(OIL_KEY);
+    var legacyMaint = localStorage.getItem(MAINT_KEY);
+    if (legacyFuel || legacyOil || legacyMaint) {
+      backup.legacyData = {
+        fuel:  legacyFuel  ? JSON.parse(legacyFuel)  : [],
+        oil:   legacyOil   ? JSON.parse(legacyOil)   : [],
+        maint: legacyMaint ? JSON.parse(legacyMaint) : []
+      };
+    }
+
+    var json     = JSON.stringify(backup, null, 2);
+    var dateStr  = new Date().toISOString().split('T')[0];
+    var filename = 'fuellog_backup_'+dateStr+'.json';
+
+    // Trigger download
+    try {
+      var blob = new Blob([json], { type:'application/json' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href=url; a.download=filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+    } catch(err) {}
+
+    // Mark backup date and refresh reminder
+    setLastBackupDate();
+    checkBackupReminder();
+    toast('Backup saved! ⬇');
+  }
+
+  // Restore all data from a JSON backup file
+  function importFullBackup(input) {
+    var file = input.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var backup = JSON.parse(ev.target.result);
+
+        // Validate it looks like a FuelLog backup
+        if (!backup || backup.appName !== 'FuelLog' || !backup.cars) {
+          toast('Invalid backup file.'); return;
+        }
+
+        // Confirm before overwriting everything
+        var carCount  = backup.cars.length;
+        var fuelCount = Object.values(backup.data || {}).reduce(function(s,d){ return s+(d.fuel||[]).length; },0);
+        var msg = 'This will REPLACE all current data with:\n• '+carCount+' car'+(carCount===1?'':'s')+'\n• '+fuelCount+' fuel entries\n\nThis cannot be undone. Continue?';
+        if (!window.confirm(msg)) { input.value=''; return; }
+
+        // Restore settings
+        if (backup.settings) {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(backup.settings));
+        }
+
+        // Restore cars
+        saveCars(backup.cars);
+
+        // Restore per-car data
+        Object.keys(backup.data || {}).forEach(function(carId) {
+          var d = backup.data[carId];
+          if (d.fuel)  localStorage.setItem(FUEL_KEY+'_car_'+carId,  JSON.stringify(d.fuel));
+          if (d.oil)   localStorage.setItem(OIL_KEY+'_car_'+carId,   JSON.stringify(d.oil));
+          if (d.maint) localStorage.setItem(MAINT_KEY+'_car_'+carId, JSON.stringify(d.maint));
+        });
+
+        // Restore legacy data if present
+        if (backup.legacyData) {
+          if (backup.legacyData.fuel)  localStorage.setItem(FUEL_KEY,  JSON.stringify(backup.legacyData.fuel));
+          if (backup.legacyData.oil)   localStorage.setItem(OIL_KEY,   JSON.stringify(backup.legacyData.oil));
+          if (backup.legacyData.maint) localStorage.setItem(MAINT_KEY, JSON.stringify(backup.legacyData.maint));
+        }
+
+        // Set active car to first car in backup
+        if (backup.cars.length) { setActiveCarId(backup.cars[0].id); }
+
+        // Mark this as a backup event too
+        setLastBackupDate();
+
+        // Refresh everything
+        updateUnitLabels();
+        renderCarSwitcher();
+        renderDash();
+        renderHistory();
+        renderOilHistory();
+        renderMaintHistory();
+        checkBackupReminder();
+        closeSettings();
+        toast('Backup restored! All data loaded. ✓');
+
+      } catch(err) {
+        toast('Could not read backup file.');
+      }
+    };
+    reader.readAsText(file);
+    input.value = '';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════
+
+  // Parse a single CSV line handling quoted fields (e.g. "field, with comma")
+  function parseCsvLine(line) {
+    var result = [], cur = '', inQuote = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i+1] === '"') { cur += '"'; i++; } // escaped quote
+        else inQuote = !inQuote;
+      } else if (ch === ',' && !inQuote) {
+        result.push(cur.trim()); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  // ══════════════════════════════════════════════════════
+  // FUEL CSV EXPORT / IMPORT
+  // ══════════════════════════════════════════════════════
+  function exportCSV() {
+    var entries=addEconomyData(loadEntries()).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    if (!entries.length) { toast('No data to export.'); return; }
+    var rows=[
+      '# FuelLog fuel export — units: km, L, km/L (metric). Do not remove this line before reimporting.',
+      'Date,Odometer (km),Distance (km),Litres,Total ($),Price/L ($),km/L,Note'
+    ];
+    entries.forEach(function(e){
+      rows.push([e.date,e.odo,e.dist!=null?Number(e.dist).toFixed(0):'',fmt(e.litres,3),fmt(e.total,2),fmt(e.ppl,3),e.kml!=null?fmt(e.kml,3):'',(e.note||'').replace(/,/g,' ')].join(','));
+    });
+    triggerDownload(rows.join('\n'),'fuellog_export.csv','csv-text','csv-output');
+    toast('CSV ready!');
+  }
+
+  function importCSV(input) {
+    var file=input.files[0]; if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var lines=ev.target.result.split('\n').filter(function(l){return l.trim() && !l.trim().startsWith('#');});
+      var existing=loadEntries(); var added=0;
+      lines.slice(1).forEach(function(line){
+        var c=parseCsvLine(line); if(c.length<5)return;
+        var odo=parseFloat(c[1]),litres=parseFloat(c[3]),total=parseFloat(c[4]);
+        if(isNaN(odo)||isNaN(litres)||isNaN(total))return;
+        if(existing.find(function(x){return Number(x.odo)===odo;}))return;
+        existing.push({id:makeId(),date:c[0].trim(),odo:odo,litres:litres,total:total,ppl:total/litres,note:c[7]?c[7].trim():''});
+        added++;
+      });
+      saveEntries(existing); renderHistory(); toast(added+' entries imported.');
+    };
+    reader.readAsText(file); input.value='';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // OIL CSV EXPORT / IMPORT
+  // ══════════════════════════════════════════════════════
+  function exportOilCSV() {
+    var records=loadOilChanges().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    if(!records.length){toast('No oil changes to export.');return;}
+    var rows=[
+      '# FuelLog oil change export — units: km (metric). Do not remove this line before reimporting.',
+      'Date,Odometer (km),Cost ($),Oil,Filter,Next km,Next date,Note'
+    ];
+    records.forEach(function(r){
+      rows.push([r.date,r.odo,r.cost!=null?Number(r.cost).toFixed(2):'',(r.oil||'').replace(/,/g,' '),(r.filter||'').replace(/,/g,' '),r.nextKm!=null?r.nextKm:'',r.nextDate||'',(r.note||'').replace(/,/g,' ')].join(','));
+    });
+    triggerDownload(rows.join('\n'),'oilchanges_export.csv','oil-csv-text','oil-csv-output');
+    toast('CSV ready!');
+  }
+
+  function importOilCSV(input) {
+    var file=input.files[0]; if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var lines=ev.target.result.split('\n').filter(function(l){return l.trim() && !l.trim().startsWith('#');});
+      var existing=loadOilChanges(); var added=0;
+      lines.slice(1).forEach(function(line){
+        var c=parseCsvLine(line); if(c.length<2)return;
+        var date=c[0].trim(), odo=parseFloat(c[1]);
+        if(!date||isNaN(odo))return;
+        if(existing.find(function(x){return Number(x.odo)===odo;}))return;
+        var cost=parseFloat(c[2]), nextKm=parseFloat(c[5]);
+        existing.push({id:makeId(),date:date,odo:odo,cost:isNaN(cost)?null:cost,oil:c[3]?c[3].trim():'',filter:c[4]?c[4].trim():'',nextKm:isNaN(nextKm)?null:nextKm,nextDate:c[6]?c[6].trim():null,note:c[7]?c[7].trim():''});
+        added++;
+      });
+      saveOilChanges(existing); renderOilHistory(); renderDash(); toast(added+' oil changes imported.');
+    };
+    reader.readAsText(file); input.value='';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // MAINTENANCE CSV EXPORT / IMPORT
+  // ══════════════════════════════════════════════════════
+  function exportMaintCSV() {
+    var records=loadMaint().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    if(!records.length){toast('No maintenance to export.');return;}
+    var rows=[
+      '# FuelLog maintenance export — units: km (metric). Do not remove this line before reimporting.',
+      'Date,Type,Odometer (km),Cost ($),Note'
+    ];
+    records.forEach(function(r){
+      rows.push([r.date,(r.type||'').replace(/,/g,' '),r.odo,r.cost!=null?Number(r.cost).toFixed(2):'',(r.note||'').replace(/,/g,' ')].join(','));
+    });
+    triggerDownload(rows.join('\n'),'maintenance_export.csv','maint-csv-text','maint-csv-output');
+    toast('CSV ready!');
+  }
+
+  function importMaintCSV(input) {
+    var file=input.files[0]; if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var lines=ev.target.result.split('\n').filter(function(l){return l.trim() && !l.trim().startsWith('#');});
+      var existing=loadMaint(); var added=0;
+      lines.slice(1).forEach(function(line){
+        var c=parseCsvLine(line); if(c.length<3)return;
+        var date=c[0].trim(), odo=parseFloat(c[2]);
+        if(!date||isNaN(odo))return;
+        var cost=parseFloat(c[3]);
+        existing.push({id:makeId(),date:date,type:c[1]?c[1].trim():'Other',odo:odo,cost:isNaN(cost)?null:cost,note:c[4]?c[4].trim():''});
+        added++;
+      });
+      saveMaint_(existing); renderMaintHistory(); renderDash(); toast(added+' items imported.');
+    };
+    reader.readAsText(file); input.value='';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // CARS CSV EXPORT / IMPORT
+  // ══════════════════════════════════════════════════════
+  function exportCarsCSV() {
+    var cars = loadCars();
+    if (!cars.length) { toast('No cars to export.'); return; }
+    var rows = [
+      '# FuelLog cars export. Do not remove this line before reimporting.',
+      'Name,Make,Model,Year,Colour'
+    ];
+    cars.forEach(function(c) {
+      rows.push([
+        (c.name   ||'').replace(/,/g,' '),
+        (c.make   ||'').replace(/,/g,' '),
+        (c.model  ||'').replace(/,/g,' '),
+        (c.year   ||'').replace(/,/g,' '),
+        (c.colour ||'').replace(/,/g,' ')
+      ].join(','));
+    });
+    var csv = rows.join('\n');
+    // Trigger download
+    try {
+      var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href=url; a.download='fuellog_cars.csv';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+    } catch(err) {}
+    // Always show textarea fallback (Firefox Android)
+    setTimeout(function(){
+      document.getElementById('cars-csv-text').value = csv;
+      document.getElementById('cars-csv-output').style.display = 'block';
+      document.getElementById('cars-csv-text').select();
+    }, 700);
+    toast('Cars CSV ready!');
+  }
+
+  function importCarsCSV(input) {
+    var file = input.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var lines = ev.target.result.split('\n').filter(function(l){ return l.trim() && !l.trim().startsWith('#'); });
+      var existing = loadCars();
+      var added = 0;
+      lines.slice(1).forEach(function(line) {
+        var c = parseCsvLine(line);
+        var name = c[0] ? c[0].trim() : '';
+        if (!name) return;
+        // Skip if a car with the same name already exists
+        if (existing.find(function(x){ return x.name.toLowerCase() === name.toLowerCase(); })) return;
+        var newCar = {
+          id:     makeId(),
+          name:   name,
+          make:   c[1] ? c[1].trim() : '',
+          model:  c[2] ? c[2].trim() : '',
+          year:   c[3] ? c[3].trim() : '',
+          colour: c[4] ? c[4].trim() : ''
+        };
+        existing.push(newCar);
+        // If this is the very first car, migrate legacy data
+        if (existing.length === 1) { migrateLegacyData(newCar.id); }
+        added++;
+      });
+      saveCars(existing);
+      if (added && !getActiveCarId()) { setActiveCarId(existing[0].id); }
+      renderSettingsCarList();
+      renderCarSwitcher();
+      renderDash();
+      toast(added + ' car' + (added===1?'':'s') + ' imported.');
+    };
+    reader.readAsText(file);
+    input.value = '';
+  }
+
+
+  // ══════════════════════════════════════════════════════
+  // INIT
+  // ══════════════════════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', function() {
+    initAds(); // initialise ad banner (does nothing until AD_ENABLED = true)
+
+    // Initialise cars, units, and persisted settings
+    costRate = getCostRate();
+    renderCarSwitcher();
+    updateUnitLabels();
+    checkBackupReminder();
+
+    var today=new Date().toISOString().split('T')[0];
+    document.getElementById('f-date').value  = today;
+    document.getElementById('o-date').value  = today;
+    document.getElementById('mt-date').value = today;
+
+    // Auto-calculate price/L
+    function updatePpl() {
+      var t=parseFloat(document.getElementById('f-total').value);
+      var l=parseFloat(document.getElementById('f-litres').value);
+      document.getElementById('f-ppl').value=(t>0&&l>0)?(t/l).toFixed(3):'';
+    }
+    document.getElementById('f-total').addEventListener('input',updatePpl);
+    document.getElementById('f-litres').addEventListener('input',updatePpl);
+
+    renderDash();
+  });
+
+</script>
+  <!-- ═══════════════════════════════════════════════════════
+       AD BANNER
+       Replace YOUR_PUBLISHER_ID and YOUR_AD_SLOT_ID with your
+       real AdSense values once your account is approved.
+       Then set AD_ENABLED = true in the script below.
+       ═══════════════════════════════════════════════════════ -->
+  <div class="ad-banner" id="ad-banner" aria-label="Advertisement" role="complementary">
+    <!--
+    STEP 1: Uncomment the script tag below and replace the values
+    STEP 2: Set AD_ENABLED = true in the config section of the JS below
+
+    <script async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_PUBLISHER_ID"
+      crossorigin="anonymous">
+    </script>
+    <ins class="adsbygoogle"
+      style="display:inline-block;width:320px;height:50px"
+      data-ad-client="ca-pub-YOUR_PUBLISHER_ID"
+      data-ad-slot="YOUR_AD_SLOT_ID">
+    </ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    -->
+  </div>
+
+  <script>
+    // Register service worker for offline support and PWA installability
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function() {})
+          .catch(function() {});
+      });
+    }
+  </script>
+
+
+</body></html>

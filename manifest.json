@@ -1,0 +1,137 @@
+{
+  "id": "/",
+  "name": "FuelLog — Car Cost Tracker",
+  "short_name": "FuelLog",
+  "description": "Track fuel, oil changes, and car maintenance. See your real cost per km.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "portrait",
+  "background_color": "#f4f4f2",
+  "theme_color": "#1D9E75",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Dashboard with Cost Breakdown and Oil Change Status"
+    },
+    {
+      "src": "/screenshots/dashboard-1.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Dashboard with Fuel Stats and Charts"
+    },
+    {
+      "src": "/screenshots/fuel-page.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Fuel Fillup Log and Fuel History with Economy Badges"
+    },
+    {
+      "src": "/screenshots/gap-detection.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Detects Unusual Gaps in Fuel Entries"
+    },
+    {
+      "src": "/screenshots/oil-page.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Oil Change Log and History"
+    },
+    {
+      "src": "/screenshots/maintainance-page.jpg",
+      "sizes": "1080x1918",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Maintainance Log and History"
+    },
+    {
+      "src": "/screenshots/dashboard-wide.png",
+      "sizes": "1076x605",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "FuelLog Dashboard on a Wide Screen"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add fillup",
+      "short_name": "Add fillup",
+      "description": "Log a new fuel fillup",
+      "url": "/?page=fuel",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Log oil change",
+      "short_name": "Oil change",
+      "description": "Log an oil change",
+      "url": "/?page=oil",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}
