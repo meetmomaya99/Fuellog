@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.workelf.fuellog",
+        "sha256_cert_fingerprints": ["A4:4B:0B:D2:F4:73:9D:A8:AB:25:90:C0:21:60:26:96:8F:80:B9:0C:B4:51:E5:20:A9:BC:B2:27:5C:1F:EC:0B"]
+      }
+    }]
